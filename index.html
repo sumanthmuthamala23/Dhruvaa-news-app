@@ -87,5 +87,14 @@
     allow="camera; microphone; clipboard-read; clipboard-write; fullscreen"
     onload="setTimeout(() => { const s = document.getElementById('splash-screen'); if(s){ s.style.opacity='0'; setTimeout(()=>s.remove(), 400); } }, 800);">
   </iframe>
+
+  <!-- Service Worker Registration for PWABuilder & Offline App Readiness -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch(() => {});
+      });
+    }
+  </script>
 </body>
 </html>
