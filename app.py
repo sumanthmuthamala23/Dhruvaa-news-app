@@ -17,12 +17,12 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-DATA_FILE = "dhruvaa_feed.json"
+DATA_FILE = "dhruvaa_cms_db.json"
 
 # ----------------- HELPER FUNCTIONS -----------------
 def load_logo_base64() -> str:
-    """Loads DHRUVAA.png from repository root if uploaded."""
-    for fname in ["DHRUVAA.png", "dhruvaa.png", "DHRUVAA.jpg", "dhruvaa.jpg"]:
+    """Loads DHRUVAA logo from repository root if uploaded."""
+    for fname in ["DHRUVAA.jpg", "DHRUVAA.png", "dhruvaa.jpg", "dhruvaa.png", "DHRUVAA NEWS.jpg"]:
         if os.path.exists(fname):
             with open(fname, "rb") as f:
                 return base64.b64encode(f.read()).decode("utf-8")
@@ -38,6 +38,9 @@ def image_to_base64(uploaded_file, max_width=1080) -> str:
     buf = io.BytesIO()
     img.save(buf, format="JPEG", quality=85)
     return base64.b64encode(buf.getvalue()).decode("utf-8")
+
+def word_count(text: str) -> int:
+    return len([w for w in text.strip().split() if w])
 
 def transliterate_to_telugu(text: str) -> str:
     """Free, unlimited phonetic Tanglish-to-Telugu converter (no API key needed)."""
@@ -67,89 +70,138 @@ def transliterate_to_telugu(text: str) -> str:
         converted_lines.append(" ".join(out_words))
     return "\n".join(converted_lines)
 
-def get_default_news():
-    today_str = datetime.date.today().strftime("%d %b %Y")
-    return [
-        {
-            "id": 103,
-            "category": "BREAKING • తాజా వార్త",
-            "location": "హైదరాబాద్ / HYDERABAD",
-            "time": f"{today_str} • Just Now",
-            "te_title": "ప్రజా సమస్యల పరిష్కారానికి ప్రత్యేక డిజిటల్ వేదిక ప్రారంభం",
-            "te_summary": "పట్టణ మరియు గ్రామీణ ప్రాంతాల్లోని మౌలిక వసతుల సమస్యలను తక్షణమే అధికారుల దృష్టికి తీసుకెళ్లేందుకు కొత్త డిజిటల్ కార్యాచరణ అమల్లోకి వచ్చింది. తాగునీరు, రహదారులు, విద్యుత్ ఫిర్యాదులపై 24 గంటల్లో స్పందించాలని ఆదేశాలు జారీ అయ్యాయి.",
-            "en_title": "Special Digital Grievance Redressal Drive Launched Across Districts",
-            "en_summary": "Authorities have rolled out a rapid-response digital mechanism to resolve civic and infrastructure complaints across urban and rural mandals within 24 hours, prioritizing drinking water, road repairs, and power supply.",
-            "image_b64": "",
-            "video_url": "",
-            "reporter": "DHRUVAA Bureau"
-        },
-        {
-            "id": 102,
-            "category": "STATE • రాష్ట్రం",
-            "location": "తెలంగాణ & ఏపీ / TS & AP",
-            "time": f"{today_str} • 1 hr ago",
-            "te_title": "రైతులకు గుడ్ న్యూస్: మార్కెట్ యార్డుల్లో కొనుగోళ్ల వేగవంతం",
-            "te_summary": "వ్యవసాయ మార్కెట్ యార్డుల్లో ధాన్యం కొనుగోలు కేంద్రాలను పూర్తిస్థాయిలో సిద్ధం చేసినట్లు అధికారులు ప్రకటించారు. రైతులకు మద్దతు ధర అందేలా ప్రత్యేక పర్యవేక్షణ బృందాలను ఏర్పాటు చేశారు.",
-            "en_title": "Procurement Centers Geared Up Across Market Yards for Farmers",
-            "en_summary": "Agriculture officials confirmed that grain procurement centers are fully operational across major market yards with dedicated monitoring teams to ensure minimum support price and swift payments.",
-            "image_b64": "",
-            "video_url": "",
-            "reporter": "DHRUVAA Agri Desk"
-        },
-        {
-            "id": 101,
-            "category": "TECH & YOUTH • యువత",
-            "location": "విజయవాడ / VIJAYAWADA",
-            "time": f"{today_str} • 3 hrs ago",
-            "te_title": "యువతకు నైపుణ్యాభివృద్ధి శిక్షణ: ఉచిత ఉద్యోగ మేళా",
-            "te_summary": "నిరుద్యోగ యువతకు ఐటీ మరియు బ్యాంకింగ్ రంగాల్లో ఉపాధి కల్పించేందుకు ఈ వారాంతంలో మెగా జాబ్ మేళా నిర్వహించనున్నారు. ఆసక్తి గల అభ్యర్థులు నేరుగా హాజరుకావచ్చని నిర్వాహకులు తెలిపారు.",
-            "en_title": "Mega Skill Development & Recruitment Drive Scheduled This Weekend",
-            "en_summary": "A large-scale job fair connecting graduates with opportunities in IT, banking, and logistics sectors will be held this weekend with on-spot interviews and free career counseling.",
-            "image_b64": "",
-            "video_url": "",
-            "reporter": "DHRUVAA Youth Desk"
-        }
-    ]
+def get_youtube_embed_url(url: str) -> str:
+    """Converts standard YouTube / Live / Shorts URLs into embeddable player URLs."""
+    u = url.strip()
+    if "youtube.com/watch?v=" in u:
+        vid = u.split("watch?v=")[1].split("&")[0]
+        return f"https://www.youtube.com/embed/{vid}"
+    if "youtu.be/" in u:
+        vid = u.split("youtu.be/")[1].split("?")[0]
+        return f"https://www.youtube.com/embed/{vid}"
+    if "youtube.com/live/" in u:
+        vid = u.split("youtube.com/live/")[1].split("?")[0]
+        return f"https://www.youtube.com/embed/{vid}"
+    if "youtube.com/shorts/" in u:
+        vid = u.split("youtube.com/shorts/")[1].split("?")[0]
+        return f"https://www.youtube.com/embed/{vid}"
+    return ""
 
-def load_news_feed():
+def get_default_db():
+    today_str = datetime.date.today().strftime("%d %b %Y")
+    return {
+        "stories": [
+            {
+                "id": 1003,
+                "status": "Published",
+                "category": "BREAKING • తాజా వార్త",
+                "location": "హైదరాబాద్ / HYDERABAD",
+                "time": f"{today_str} • Live",
+                "te_title": "ప్రజా సమస్యల సత్వర పరిష్కారానికి ప్రత్యేక డిజిటల్ వేదిక ప్రారంభం",
+                "te_summary": "పట్టణ మరియు గ్రామీణ ప్రాంతాల్లోని మౌలిక వసతుల సమస్యలను తక్షణమే అధికారుల దృష్టికి తీసుకెళ్లేందుకు కొత్త డిజిటల్ కార్యాచరణ అమల్లోకి వచ్చింది. తాగునీరు, రహదారులు, విద్యుత్ సరఫరా మరియు పారిశుద్ధ్య ఫిర్యాదులపై 24 గంటల్లో స్పందించాలని ఉన్నతాధికారులు స్పష్టమైన ఆదేశాలు జారీ చేశారు. ప్రతి మండల కేంద్రంలో ప్రత్యేక పర్యవేక్షణ అధికారిని నియమించి, ప్రజల నుండి వచ్చే వినతులను ఎప్పటికప్పుడు సమీక్షించనున్నారు. క్షేత్రస్థాయిలో పనుల నాణ్యతను తనిఖీ చేసేందుకు ప్రత్యేక బృందాలు పర్యటిస్తాయని, నిర్లక్ష్యం వహించే సిబ్బందిపై కఠిన చర్యలు తీసుకుంటామని అధికారులు హెచ్చరించారు. ఈ డిజిటల్ వేదిక ద్వారా సామాన్య ప్రజలకు కార్యాలయాల చుట్టూ తిరిగే ఇబ్బంది తప్పి, పారదర్శకంగా సేవలు అందుతాయని పలువురు హర్షం వ్యక్తం చేస్తున్నారు.",
+                "en_title": "Special Digital Grievance Redressal Drive Launched Across All Mandals",
+                "en_summary": "Authorities have rolled out a rapid-response digital mechanism to resolve civic and infrastructure complaints across urban and rural mandals within 24 hours. Priority is being accorded to drinking water supply, road repairs, uninterrupted electricity, and sanitation works. Dedicated nodal officers have been appointed at every mandal headquarters to monitor incoming petitions in real time and ensure transparent follow-up. Special inspection squads will conduct surprise field visits to verify the quality of ongoing civil works, with strict disciplinary action warned against administrative negligence. Citizens and local representatives welcomed the initiative, noting that the unified digital portal eliminates repeated visits to government offices and accelerates grassroots accountability.",
+                "image_b64": "",
+                "video_url": "",
+                "reporter": "DHRUVAA State Bureau",
+                "editor": "Senior Desk Editor",
+                "approved_by": "Head of App",
+                "views": 1420
+            },
+            {
+                "id": 1002,
+                "status": "Published",
+                "category": "STATE • రాష్ట్రం",
+                "location": "తెలంగాణ & ఏపీ / TS & AP",
+                "time": f"{today_str} • 1 hr ago",
+                "te_title": "వ్యవసాయ మార్కెట్ యార్డుల్లో కొనుగోళ్ల వేగవంతం: రైతులకు భరోసా",
+                "te_summary": "వ్యవసాయ మార్కెట్ యార్డుల్లో ధాన్యం మరియు పత్తి కొనుగోలు కేంద్రాలను పూర్తిస్థాయిలో సిద్ధం చేసినట్లు వ్యవసాయ శాఖ అధికారులు ప్రకటించారు. రైతులకు కనీస మద్దతు ధర అందేలా ప్రత్యేక పర్యవేక్షణ బృందాలను ఏర్పాటు చేశారు. తేమ శాతం పరిశీలన, తూకం ప్రక్రియలో ఎలాంటి జాప్యం లేకుండా తక్షణమే రశీదులు జారీ చేయాలని సిబ్బందికి సూచించారు. కొనుగోలు చేసిన 48 గంటల్లోనే రైతుల బ్యాంకు ఖాతాల్లో నేరుగా నగదు జమ అయ్యేలా చర్యలు తీసుకుంటున్నామని తెలిపారు. వర్షాల దృష్ట్యా మార్కెట్ యార్డుల్లో సరిపడా టార్పాలిన్లు, గోనె సంచులు మరియు తాగునీటి వసతిని అందుబాటులో ఉంచారు.",
+                "en_title": "Procurement Centers Geared Up Across Market Yards to Ensure Swift Payments",
+                "en_summary": "Agriculture officials confirmed that grain and cotton procurement centers are fully operational across major market yards with dedicated monitoring teams to guarantee minimum support price for farmers. Staff have been instructed to complete moisture testing and weighment without delay and issue digital receipts on the spot. Officials assured that direct bank transfers will be credited into farmers' accounts within 48 hours of procurement. In view of unseasonal weather forecasts, adequate tarpaulins, gunny bags, and drinking water facilities have been stocked at all rural purchase centers.",
+                "image_b64": "",
+                "video_url": "",
+                "reporter": "DHRUVAA Agri Desk",
+                "editor": "Senior Desk Editor",
+                "approved_by": "Head of App",
+                "views": 985
+            }
+        ],
+        "staff": [
+            {"name": "Sumanth Muthamala", "role": "Head of App", "zone": "State Headquarters", "active": True},
+            {"name": "Ramesh Kumar", "role": "News Editor", "zone": "Central Desk", "active": True},
+            {"name": "Karthik Reddy", "role": "Reporter", "zone": "Hyderabad / Khammam", "active": True},
+            {"name": "Anitha Rao", "role": "Reporter", "zone": "Vijayawada / Warangal", "active": True}
+        ],
+        "ads": [
+            {
+                "id": 1,
+                "sponsor": "DHRUVAA Digital Promotions",
+                "tagline": "మీ వ్యాపార ప్రకటనల కోసం సంప్రదించండి • Advertise on DHRUVAA News App & Web",
+                "link": "https://dhruvaa-news.streamlit.app",
+                "image_b64": "",
+                "active": True
+            }
+        ],
+        "epaper": {
+            "edition_title": f"DHRUVAA Daily E-Paper • {today_str}",
+            "pdf_or_drive_link": "",
+            "page_image_b64": "",
+            "highlights": "నేటి ప్రత్యేక సంచిక: రాష్ట్ర రాజకీయాలు, జిల్లా వార్తలు, ఉద్యోగ సమాచారం మరియు క్రీడా విశేషాలు."
+        },
+        "youtube_live": {
+            "channel_title": "DHRUVAA NEWS LIVE • ధ్రువ న్యూస్ లైవ్",
+            "live_url": "https://www.youtube.com/watch?v=jfKfPfyJRdk",
+            "ticker": "🔴 BREAKING: DHRUVAA News App & Web Simultaneous Publishing Live Now!"
+        },
+        "notifications": [
+            {
+                "id": 1,
+                "time": f"{today_str} • Just Now",
+                "title": "🔴 BREAKING ALERT: DHRUVAA News 160-Word Edition Live",
+                "message": "Read crisp 160-word verified news in Telugu & English across Mobile and Web."
+            }
+        ]
+    }
+
+def load_db():
     if os.path.exists(DATA_FILE):
         try:
             with open(DATA_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
-                if isinstance(data, list) and len(data) > 0:
+                if isinstance(data, dict) and "stories" in data:
                     return data
         except Exception:
             pass
-    return get_default_news()
+    return get_default_db()
 
-def save_news_feed(feed_list):
+def save_db(db_data):
     try:
+        db_data["stories"] = db_data["stories"][:80]
         with open(DATA_FILE, "w", encoding="utf-8") as f:
-            json.dump(feed_list[:60], f, ensure_ascii=False, indent=2)
+            json.dump(db_data, f, ensure_ascii=False, indent=2)
     except Exception:
         pass
 
 # ----------------- SESSION STATE INIT -----------------
-if "news_feed" not in st.session_state:
-    st.session_state.news_feed = load_news_feed()
+if "cms_db" not in st.session_state:
+    st.session_state.cms_db = load_db()
 if "card_idx" not in st.session_state:
     st.session_state.card_idx = 0
-if "lang_mode" not in st.session_state:
-    st.session_state.lang_mode = "తెలుగు"
+if "cms_section" not in st.session_state:
+    st.session_state.cms_section = "News Upload"
 
-# ----------------- MOBILE APP UI STYLING (ANDROID & iOS READY) -----------------
+# ----------------- MOBILE APP UI STYLING -----------------
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Telugu:wght@400;600;700;800&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap');
 
-    /* Hide Streamlit chrome so it feels like a native Android/iOS mobile app */
     #MainMenu, footer, header {visibility: hidden;}
     .block-container {
-        padding-top: 0.6rem !important;
+        padding-top: 0.55rem !important;
         padding-bottom: 1.5rem !important;
-        padding-left: 0.7rem !important;
-        padding-right: 0.7rem !important;
-        max-width: 520px !important;
+        padding-left: 0.65rem !important;
+        padding-right: 0.65rem !important;
+        max-width: 560px !important;
     }
     html, body, p, div:not([data-testid="stIconMaterial"]), input, textarea, button {
         font-family: 'Plus Jakarta Sans', 'Noto Sans Telugu', sans-serif !important;
@@ -163,12 +215,12 @@ st.markdown("""
     .dhruvaa-topbar {
         background: linear-gradient(135deg, #0f172a 0%, #b91c1c 100%);
         color: #ffffff;
-        padding: 12px 16px;
+        padding: 11px 15px;
         border-radius: 14px;
         display: flex;
         justify-content: space-between;
         align-items: center;
-        margin-bottom: 10px;
+        margin-bottom: 8px;
         box-shadow: 0 4px 14px rgba(185, 28, 28, 0.25);
     }
     .dhruvaa-brand {
@@ -183,12 +235,11 @@ st.markdown("""
         font-size: 16px;
         padding: 4px 9px;
         border-radius: 8px;
-        letter-spacing: 0.5px;
     }
     .dhruvaa-title {
-        font-size: 19px;
+        font-size: 18px;
         font-weight: 800;
-        letter-spacing: 0.6px;
+        letter-spacing: 0.5px;
         line-height: 1.1;
     }
     .dhruvaa-sub {
@@ -196,10 +247,49 @@ st.markdown("""
         color: #fde68a;
         font-weight: 600;
     }
+    .ticker-strip {
+        background: #fef2f2;
+        border: 1px solid #fecaca;
+        color: #991b1b;
+        padding: 6px 10px;
+        border-radius: 9px;
+        font-size: 12px;
+        font-weight: 700;
+        margin-bottom: 8px;
+    }
+    .workflow-box {
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 12px 14px;
+        margin-top: 10px;
+    }
+    .wf-step {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 5px 0;
+        font-size: 13.5px;
+        font-weight: 600;
+        color: #1e293b;
+    }
+    .wf-num {
+        background: #f1f5f9;
+        color: #0f172a;
+        border: 1px solid #cbd5e1;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 12px;
+        font-weight: 800;
+        flex-shrink: 0;
+    }
     div.stButton > button {
-        border-radius: 12px !important;
+        border-radius: 11px !important;
         font-weight: 700 !important;
-        padding: 0.55rem 0.8rem !important;
     }
     div.stButton > button[kind="primary"] {
         background: linear-gradient(90deg, #b91c1c, #dc2626) !important;
@@ -209,13 +299,18 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+db = st.session_state.cms_db
+
 # ----------------- TOP MOBILE APP HEADER -----------------
 logo_b64 = load_logo_base64()
 logo_inline = (
-    f'<img src="data:image/png;base64,{logo_b64}" style="height:36px; border-radius:6px; background:#fff; padding:2px;">'
+    f'<img src="data:image/jpeg;base64,{logo_b64}" style="height:36px; border-radius:6px; background:#fff; padding:2px;">'
     if logo_b64 else
     '<div class="dhruvaa-badge">DN</div>'
 )
+
+pending_count = len([s for s in db["stories"] if s["status"] != "Published"])
+notif_count = len(db.get("notifications", []))
 
 st.markdown(f"""
 <div class="dhruvaa-topbar">
@@ -223,21 +318,33 @@ st.markdown(f"""
         {logo_inline}
         <div>
             <div class="dhruvaa-title">DHRUVAA NEWS</div>
-            <div class="dhruvaa-sub">ధ్రువ న్యూస్ • Fast Short News</div>
+            <div class="dhruvaa-sub">ధ్రువ న్యూస్ • App & Web Live</div>
         </div>
     </div>
-    <div style="font-size:11px; background:rgba(255,255,255,0.16); padding:4px 10px; border-radius:20px; font-weight:700;">
-        🔴 LIVE
+    <div style="text-align:right;">
+        <span style="font-size:11px; background:rgba(255,255,255,0.18); padding:4px 9px; border-radius:20px; font-weight:700;">
+            🔴 LIVE
+        </span>
     </div>
 </div>
 """, unsafe_allow_html=True)
 
-# ----------------- NAVIGATION TABS -----------------
-tab_reader, tab_publish = st.tabs(["📱 News Feed (రీడ్)", "✍️ Post News (రిపోర్టర్)"])
+# Breaking Alert Ticker
+latest_ticker = db["notifications"][0]["title"] if db.get("notifications") else db["youtube_live"]["ticker"]
+st.markdown(f'<div class="ticker-strip">🔔 {latest_ticker}</div>', unsafe_allow_html=True)
 
-# ================= TAB 1: WAY2NEWS-STYLE SHORT CARD READER =================
-with tab_reader:
-    # Language & Category Filter Bar
+# ----------------- PRIMARY APP NAVIGATION -----------------
+nav_reader, nav_epaper, nav_live, nav_cms = st.tabs([
+    "📱 News Feed",
+    "📰 E-Paper",
+    "📺 YouTube Live",
+    f"🎛️ CMS ({pending_count})"
+])
+
+# ================= TAB 1: LIVE PUBLISHED 160-WORD NEWS FEED =================
+with nav_reader:
+    published_stories = [s for s in db["stories"] if s["status"] == "Published"]
+
     c_lang, c_cat = st.columns([1.15, 1.25])
     with c_lang:
         lang_choice = st.radio(
@@ -247,17 +354,17 @@ with tab_reader:
             label_visibility="collapsed"
         )
     with c_cat:
-        categories = ["ALL NEWS"] + sorted(list({item["category"] for item in st.session_state.news_feed}))
+        categories = ["ALL NEWS"] + sorted(list({item["category"] for item in published_stories}))
         selected_cat = st.selectbox("Category", categories, label_visibility="collapsed")
 
     filtered_feed = (
-        st.session_state.news_feed
+        published_stories
         if selected_cat == "ALL NEWS"
-        else [n for n in st.session_state.news_feed if n["category"] == selected_cat]
+        else [n for n in published_stories if n["category"] == selected_cat]
     )
 
     if not filtered_feed:
-        st.info("No stories in this category yet.")
+        st.info("No published stories in this category yet. Approve stories in CMS ➔ Approval Center.")
     else:
         total_cards = len(filtered_feed)
         if st.session_state.card_idx >= total_cards:
@@ -265,32 +372,47 @@ with tab_reader:
 
         item = filtered_feed[st.session_state.card_idx]
 
-        # Prepare Card Visual (Photo or Branded News Banner)
-        if item.get("image_b64"):
-            media_html = f'<img src="data:image/jpeg;base64,{item["image_b64"]}" style="width:100%; height:235px; object-fit:cover; display:block;">'
-        else:
-            media_html = f"""
-            <div style="width:100%; height:170px; background: linear-gradient(135deg, #1e293b 0%, #991b1b 70%, #d97706 100%); display:flex; flex-direction:column; justify-content:center; align-items:center; color:white; padding:16px; text-align:center;">
-                <div style="font-size:26px; font-weight:900; letter-spacing:1.5px;">DHRUVAA NEWS</div>
-                <div style="font-size:13px; color:#fef3c7; font-weight:700; margin-top:4px;">ధ్రువ న్యూస్ • {item['category']}</div>
+        # Active Sponsor Ad Banner (from Advertisements Module)
+        active_ads = [a for a in db.get("ads", []) if a.get("active")]
+        ad_banner_html = ""
+        if active_ads:
+            ad = active_ads[st.session_state.card_idx % len(active_ads)]
+            ad_img = f'<img src="data:image/jpeg;base64,{ad["image_b64"]}" style="width:100%; max-height:70px; object-fit:cover; border-radius:6px; margin-bottom:4px;">' if ad.get("image_b64") else ""
+            ad_banner_html = f"""
+            <div style="margin-top:10px; background:#fffbeb; border:1px solid #fde68a; border-radius:8px; padding:7px 10px;">
+                {ad_img}
+                <div style="display:flex; justify-content:space-between; align-items:center; font-size:11px;">
+                    <span style="font-weight:800; color:#92400e;">📢 AD • {ad['sponsor']}</span>
+                    <a href="{ad.get('link','#')}" target="_blank" style="color:#b91c1c; font-weight:800; text-decoration:none;">Visit ➔</a>
+                </div>
+                <div style="font-size:11.5px; color:#78350f; margin-top:2px;">{ad['tagline']}</div>
             </div>
             """
 
-        # Language Content Block
+        if item.get("image_b64"):
+            media_html = f'<img src="data:image/jpeg;base64,{item["image_b64"]}" style="width:100%; height:225px; object-fit:cover; display:block;">'
+        else:
+            media_html = f"""
+            <div style="width:100%; height:150px; background: linear-gradient(135deg, #0f172a 0%, #991b1b 70%, #d97706 100%); display:flex; flex-direction:column; justify-content:center; align-items:center; color:white; padding:14px; text-align:center;">
+                <div style="font-size:24px; font-weight:900; letter-spacing:1.4px;">DHRUVAA NEWS</div>
+                <div style="font-size:12.5px; color:#fef3c7; font-weight:700; margin-top:4px;">ధ్రువ న్యూస్ • {item['category']}</div>
+            </div>
+            """
+
         if lang_choice == "తెలుగు":
-            headline_html = f'<div style="font-size:21px; font-weight:800; color:#0f172a; line-height:1.35; margin-bottom:8px;">{item["te_title"]}</div>'
-            body_html = f'<div style="font-size:15.5px; color:#334155; line-height:1.68; text-align:justify;">{item["te_summary"]}</div>'
+            headline_html = f'<div style="font-size:20px; font-weight:800; color:#0f172a; line-height:1.35; margin-bottom:8px;">{item["te_title"]}</div>'
+            body_html = f'<div style="font-size:15px; color:#1e293b; line-height:1.68; text-align:justify;">{item["te_summary"]}</div>'
         elif lang_choice == "English":
-            headline_html = f'<div style="font-size:20px; font-weight:800; color:#0f172a; line-height:1.3; margin-bottom:8px;">{item["en_title"]}</div>'
-            body_html = f'<div style="font-size:14.8px; color:#334155; line-height:1.62; text-align:justify;">{item["en_summary"]}</div>'
+            headline_html = f'<div style="font-size:19.5px; font-weight:800; color:#0f172a; line-height:1.3; margin-bottom:8px;">{item["en_title"]}</div>'
+            body_html = f'<div style="font-size:14.5px; color:#1e293b; line-height:1.62; text-align:justify;">{item["en_summary"]}</div>'
         else:
             headline_html = f"""
-            <div style="font-size:19.5px; font-weight:800; color:#0f172a; line-height:1.32; margin-bottom:4px;">{item["te_title"]}</div>
-            <div style="font-size:16.5px; font-weight:700; color:#991b1b; line-height:1.3; margin-bottom:8px;">{item["en_title"]}</div>
+            <div style="font-size:19px; font-weight:800; color:#0f172a; line-height:1.32; margin-bottom:4px;">{item["te_title"]}</div>
+            <div style="font-size:16px; font-weight:700; color:#991b1b; line-height:1.3; margin-bottom:8px;">{item["en_title"]}</div>
             """
             body_html = f"""
-            <div style="font-size:14.8px; color:#1e293b; line-height:1.65; margin-bottom:8px; text-align:justify;">{item["te_summary"]}</div>
-            <div style="font-size:13.8px; color:#475569; line-height:1.58; border-top:1px dashed #cbd5e1; padding-top:7px; text-align:justify;">{item["en_summary"]}</div>
+            <div style="font-size:14.5px; color:#1e293b; line-height:1.65; margin-bottom:8px; text-align:justify;">{item["te_summary"]}</div>
+            <div style="font-size:13.5px; color:#475569; line-height:1.58; border-top:1px dashed #cbd5e1; padding-top:7px; text-align:justify;">{item["en_summary"]}</div>
             """
 
         video_btn_html = ""
@@ -302,7 +424,6 @@ with tab_reader:
             </a>
             """
 
-        # Render Way2News Card + Client-Side JPEG Share Poster Generator
         card_widget = f"""
         <!DOCTYPE html>
         <html>
@@ -324,9 +445,7 @@ with tab_reader:
                 box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
                 border: 1px solid #e2e8f0;
             }}
-            .media-box {{
-                position: relative;
-            }}
+            .media-box {{ position: relative; }}
             .cat-tag {{
                 position: absolute;
                 top: 12px;
@@ -337,22 +456,19 @@ with tab_reader:
                 font-weight: 800;
                 padding: 4px 10px;
                 border-radius: 6px;
-                box-shadow: 0 2px 8px rgba(0,0,0,0.3);
             }}
             .brand-watermark {{
                 position: absolute;
                 bottom: 10px;
                 right: 12px;
-                background: rgba(15, 23, 42, 0.85);
+                background: rgba(15, 23, 42, 0.88);
                 color: #facc15;
                 font-size: 11px;
                 font-weight: 800;
                 padding: 3px 9px;
                 border-radius: 5px;
             }}
-            .content-pad {{
-                padding: 15px 16px 14px 16px;
-            }}
+            .content-pad {{ padding: 14px 16px 14px 16px; }}
             .meta-row {{
                 display: flex;
                 justify-content: space-between;
@@ -362,8 +478,8 @@ with tab_reader:
                 margin-bottom: 6px;
             }}
             .card-footer {{
-                margin-top: 12px;
-                padding-top: 9px;
+                margin-top: 11px;
+                padding-top: 8px;
                 border-top: 1px solid #e2e8f0;
                 display: flex;
                 justify-content: space-between;
@@ -372,13 +488,9 @@ with tab_reader:
                 color: #64748b;
                 font-weight: 700;
             }}
-            .share-bar {{
-                display: flex;
-                gap: 8px;
-                margin-top: 10px;
-            }}
             .share-btn {{
-                flex: 1;
+                width: 100%;
+                margin-top: 10px;
                 background: #15803d;
                 color: #fff;
                 border: none;
@@ -387,7 +499,6 @@ with tab_reader:
                 font-size: 13px;
                 font-weight: 800;
                 cursor: pointer;
-                text-align: center;
             }}
         </style>
         </head>
@@ -406,22 +517,19 @@ with tab_reader:
                     {headline_html}
                     {body_html}
                     {video_btn_html}
+                    {ad_banner_html}
                     <div class="card-footer">
-                        <span>By {item.get('reporter', 'DHRUVAA Desk')}</span>
-                        <span>Card {st.session_state.card_idx + 1} of {total_cards} • DHRUVAA</span>
+                        <span>By {item.get('reporter', 'DHRUVAA Desk')} • 👁️ {item.get('views', 100)}</span>
+                        <span>Card {st.session_state.card_idx + 1}/{total_cards} • App & Web</span>
                     </div>
                 </div>
             </div>
-
-            <div class="share-bar">
-                <button class="share-btn" onclick="saveShareCard()">📲 Download WhatsApp News Card (HD Image)</button>
-            </div>
+            <button class="share-btn" onclick="saveShareCard()">📲 Download WhatsApp News Card (HD Image)</button>
             <div id="dl-msg" style="text-align:center; font-size:12px; font-weight:700; color:#15803d; margin-top:5px;"></div>
-
             <script>
                 async function saveShareCard() {{
                     const msg = document.getElementById('dl-msg');
-                    msg.innerText = "⏳ Creating DHRUVAA share card...";
+                    msg.innerText = "⏳ Creating DHRUVAA 160-word share card...";
                     await document.fonts.ready;
                     const card = document.getElementById('news-card');
                     const canvas = await html2canvas(card, {{ scale: 2.5, useCORS: true, backgroundColor: "#ffffff" }});
@@ -435,10 +543,9 @@ with tab_reader:
         </body>
         </html>
         """
-        card_height = 610 if lang_choice == "Bilingual" else 535
+        card_height = 790 if lang_choice == "Bilingual" else 660
         components.html(card_widget, height=card_height, scrolling=True)
 
-        # Bottom Mobile Thumb Navigation (Previous / Next Story)
         nav1, nav2, nav3 = st.columns([1, 1.1, 1])
         with nav1:
             if st.button("⬅️ Prev", use_container_width=True):
@@ -453,62 +560,363 @@ with tab_reader:
                 st.session_state.card_idx = (st.session_state.card_idx + 1) % total_cards
                 st.rerun()
 
-# ================= TAB 2: REPORTER / ADMIN INSTANT PUBLISH =================
-with tab_publish:
-    st.markdown("#### ✍️ Publish Instant Short News to DHRUVAA Feed")
-
-    with st.expander("🔤 Free Tanglish ➔ Telugu Typing Tool (Unlimited)", expanded=False):
-        tanglish_txt = st.text_input("Type Telugu in English letters:", placeholder="e.g., Nedu Hyderabad lo bhari varsham kurustondi")
-        if st.button("Convert to Telugu"):
-            if tanglish_txt.strip():
-                st.code(transliterate_to_telugu(tanglish_txt), language=None)
-
-    with st.form("publish_news_form", clear_on_submit=True):
-        p_cat = st.selectbox(
-            "Category",
-            [
-                "BREAKING • తాజా వార్త",
-                "POLITICS • రాజకీయం",
-                "DISTRICT • జిల్లా వార్తలు",
-                "STATE • రాష్ట్రం",
-                "SPORTS • క్రీడలు",
-                "CINEMA • సినిమా",
-                "TECH & YOUTH • యువత"
-            ]
+# ================= TAB 2: E-PAPER READER (రోజువారీ పేపర్) =================
+with nav_epaper:
+    ep = db.get("epaper", {})
+    st.markdown(f"### 📰 {ep.get('edition_title', 'DHRUVAA Daily E-Paper')}")
+    st.info(ep.get("highlights", "Daily Digital Newspaper Edition"))
+    if ep.get("page_image_b64"):
+        st.markdown(
+            f'<img src="data:image/jpeg;base64,{ep["page_image_b64"]}" style="width:100%; border-radius:10px; border:1px solid #cbd5e1;">',
+            unsafe_allow_html=True
         )
-        p_loc = st.text_input("Location / Mandal / District", value="హైదరాబాద్ / HYDERABAD")
-        p_photo = st.file_uploader("📸 Upload News Photo (Camera or Gallery)", type=["jpg", "jpeg", "png", "webp"])
-        p_video = st.text_input("🎬 Video Link (Optional YouTube / Drive / Reel URL)", placeholder="https://...")
+    if ep.get("pdf_or_drive_link"):
+        st.link_button("📥 Open / Download Full E-Paper PDF", ep["pdf_or_drive_link"], type="primary", use_container_width=True)
+    elif not ep.get("page_image_b64"):
+        st.caption("Upload today's E-Paper front page or PDF link inside **CMS ➔ E-Paper**.")
 
-        p_te_title = st.text_input("తెలుగు హెడ్‌లైన్ (Telugu Headline)")
-        p_te_body = st.text_area("తెలుగు సంక్షిప్త వార్త (Telugu 60-Word Summary)", height=110)
+# ================= TAB 3: YOUTUBE & LIVE (వీడియోలు, లైవ్) =================
+with nav_live:
+    yt = db.get("youtube_live", {})
+    st.markdown(f"### 📺 {yt.get('channel_title', 'DHRUVAA NEWS LIVE')}")
+    embed_src = get_youtube_embed_url(yt.get("live_url", ""))
+    if embed_src:
+        components.html(
+            f'<iframe width="100%" height="260" src="{embed_src}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen style="border-radius:12px;"></iframe>',
+            height=270
+        )
+    elif yt.get("live_url"):
+        st.link_button("▶ Open YouTube Live Stream", yt["live_url"], type="primary", use_container_width=True)
 
-        p_en_title = st.text_input("English Headline")
-        p_en_body = st.text_area("English Short Summary (60 Words)", height=110)
+    # Also list video news stories
+    video_stories = [s for s in db["stories"] if s["status"] == "Published" and s.get("video_url")]
+    if video_stories:
+        st.markdown("#### 🎬 Recent Video Bulletins")
+        for vs in video_stories:
+            st.markdown(f"**{vs['te_title']}** ({vs['location']})")
+            st.link_button("▶ Watch Video", vs["video_url"], use_container_width=True)
 
-        p_reporter = st.text_input("Reporter / Bureau Name", value="DHRUVAA Reporter")
+# ================= TAB 4: DHRUVA NEWS CONTENT MANAGEMENT SYSTEM (CMS) =================
+with nav_cms:
+    st.markdown("""
+    <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:12px; padding:12px 14px; margin-bottom:10px;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div>
+                <div style="font-size:17px; font-weight:800; color:#0f172a;">DHRUVA NEWS</div>
+                <div style="font-size:11px; font-weight:700; color:#64748b; letter-spacing:0.6px;">CONTENT MANAGEMENT SYSTEM</div>
+            </div>
+            <span style="background:#dcfce7; color:#15803d; font-size:11px; font-weight:800; padding:4px 10px; border-radius:20px;">
+                CMS Active
+            </span>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
-        submitted = st.form_submit_button("🚀 Publish Live on DHRUVAA News", type="primary", use_container_width=True)
-        if submitted:
-            if not p_te_title.strip() and not p_en_title.strip():
-                st.error("Please enter at least a Telugu or English headline.")
-            else:
-                img_str = image_to_base64(p_photo) if p_photo is not None else ""
-                now_time = datetime.datetime.now().strftime("%d %b %Y • %I:%M %p")
-                new_story = {
-                    "id": int(datetime.datetime.now().timestamp()),
-                    "category": p_cat,
-                    "location": p_loc.strip() or "DHRUVAA Bureau",
-                    "time": now_time,
-                    "te_title": p_te_title.strip() or p_en_title.strip(),
-                    "te_summary": p_te_body.strip() or p_en_body.strip(),
-                    "en_title": p_en_title.strip() or p_te_title.strip(),
-                    "en_summary": p_en_body.strip() or p_te_body.strip(),
-                    "image_b64": img_str,
-                    "video_url": p_video.strip(),
-                    "reporter": p_reporter.strip() or "DHRUVAA Desk"
-                }
-                st.session_state.news_feed.insert(0, new_story)
-                save_news_feed(st.session_state.news_feed)
-                st.session_state.card_idx = 0
-                st.success("✅ Published live to DHRUVAA News! Switch to the 'News Feed' tab to view & share.")
+    # 8-Tile CMS Dashboard Grid (Matching Reference Layout)
+    r1c1, r1c2 = st.columns(2)
+    with r1c1:
+        if st.button("📰 News Upload\nవార్తల ప్రచురణ", use_container_width=True):
+            st.session_state.cms_section = "News Upload"
+    with r1c2:
+        if st.button("👥 Staff Management\nరిపోర్టర్ల నిర్వహణ", use_container_width=True):
+            st.session_state.cms_section = "Staff Management"
+
+    r2c1, r2c2 = st.columns(2)
+    with r2c1:
+        if st.button(f"🛡️ Approval Center ({pending_count})\nవార్తల ఆమోదం", use_container_width=True):
+            st.session_state.cms_section = "Approval Center"
+    with r2c2:
+        if st.button("📣 Advertisements\nప్రకటనల నిర్వహణ", use_container_width=True):
+            st.session_state.cms_section = "Advertisements"
+
+    r3c1, r3c2 = st.columns(2)
+    with r3c1:
+        if st.button("📖 E-Paper\nరోజువారీ పేపర్", use_container_width=True):
+            st.session_state.cms_section = "E-Paper"
+    with r3c2:
+        if st.button("▶️ YouTube & Live\nవీడియోలు, లైవ్", use_container_width=True):
+            st.session_state.cms_section = "YouTube & Live"
+
+    r4c1, r4c2 = st.columns(2)
+    with r4c1:
+        if st.button("🔔 Notifications\nబ్రేకింగ్ అలర్ట్స్", use_container_width=True):
+            st.session_state.cms_section = "Notifications"
+    with r4c2:
+        if st.button("📈 Reports\nవీక్షణలు, గణాంకాలు", use_container_width=True):
+            st.session_state.cms_section = "Reports"
+
+    # 4-Step Publishing Workflow Card (వార్త ప్రచురణ విధానం)
+    st.markdown("""
+    <div class="workflow-box">
+        <div style="font-size:15px; font-weight:800; color:#0f172a; margin-bottom:6px;">వార్త ప్రచురణ విధానం (Publishing Workflow)</div>
+        <div class="wf-step"><span class="wf-num">1</span> రిపోర్టర్ వార్త, ఫోటో, వీడియో పంపిస్తారు.</div>
+        <div class="wf-step"><span class="wf-num">2</span> న్యూస్ ఎడిటర్ పరిశీలించి సవరించుతారు.</div>
+        <div class="wf-step"><span class="wf-num">3</span> Head of App తుది అనుమతి ఇస్తారు.</div>
+        <div class="wf-step"><span class="wf-num">4</span> ఒకేసారి యాప్, వెబ్‌సైట్‌లో ప్రచురితమవుతుంది.</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    st.divider()
+    sec = st.session_state.cms_section
+
+    # ---------------- 1. NEWS UPLOAD (160 WORDS) ----------------
+    if sec == "News Upload":
+        st.markdown("#### 📰 News Upload • వార్తల ప్రచురణ (160-Word Standard)")
+
+        with st.expander("🔤 Free Tanglish ➔ Telugu Converter (Unlimited)", expanded=False):
+            t_in = st.text_input("Type Telugu in English letters:", placeholder="e.g., Nedu Hyderabad lo pratyeka samavesam jarigindi")
+            if st.button("Convert to Telugu"):
+                if t_in.strip():
+                    st.code(transliterate_to_telugu(t_in), language=None)
+
+        active_reporters = [m["name"] for m in db["staff"] if m.get("active")] or ["DHRUVAA Reporter"]
+
+        with st.form("cms_news_upload_form", clear_on_submit=True):
+            u_reporter = st.selectbox("1. Reporter Name (రిపోర్టర్)", active_reporters)
+            u_cat = st.selectbox(
+                "Category",
+                [
+                    "BREAKING • తాజా వార్త",
+                    "POLITICS • రాజకీయం",
+                    "DISTRICT • జిల్లా వార్తలు",
+                    "STATE • రాష్ట్రం",
+                    "SPORTS • క్రీడలు",
+                    "CINEMA • సినిమా",
+                    "TECH & YOUTH • యువత"
+                ]
+            )
+            u_loc = st.text_input("Location / Mandal / District", value="హైదరాబాద్ / HYDERABAD")
+            u_photo = st.file_uploader("📸 Attach News Photo", type=["jpg", "jpeg", "png", "webp"])
+            u_video = st.text_input("🎬 Video Link (YouTube / Drive / Reel URL)", placeholder="https://...")
+
+            u_te_title = st.text_input("తెలుగు హెడ్‌లైన్ (Telugu Headline)")
+            u_te_body = st.text_area("తెలుగు వార్త (Up to 160 Words Summary)", height=150)
+
+            u_en_title = st.text_input("English Headline")
+            u_en_body = st.text_area("English News Summary (Up to 160 Words)", height=150)
+
+            publish_mode = st.radio(
+                "Submission Routing",
+                [
+                    "Submit via 4-Step Workflow (Step 1 ➔ News Editor Review)",
+                    "Direct Head of App Publish (Instant App & Web Live)"
+                ]
+            )
+
+            if st.form_submit_button("🚀 Submit Story to DHRUVAA CMS", type="primary", use_container_width=True):
+                if not u_te_title.strip() and not u_en_title.strip():
+                    st.error("Please enter at least a Telugu or English headline.")
+                else:
+                    te_wc = word_count(u_te_body)
+                    en_wc = word_count(u_en_body)
+                    if te_wc > 175 or en_wc > 175:
+                        st.warning(f"Note: Word count is {max(te_wc, en_wc)} words (recommended max: 160 words).")
+
+                    img_str = image_to_base64(u_photo) if u_photo is not None else ""
+                    now_time = datetime.datetime.now().strftime("%d %b %Y • %I:%M %p")
+                    is_direct = "Direct Head of App" in publish_mode
+
+                    new_story = {
+                        "id": int(datetime.datetime.now().timestamp()),
+                        "status": "Published" if is_direct else "Pending Editor",
+                        "category": u_cat,
+                        "location": u_loc.strip() or "DHRUVAA Bureau",
+                        "time": now_time,
+                        "te_title": u_te_title.strip() or u_en_title.strip(),
+                        "te_summary": u_te_body.strip() or u_en_body.strip(),
+                        "en_title": u_en_title.strip() or u_te_title.strip(),
+                        "en_summary": u_en_body.strip() or u_te_body.strip(),
+                        "image_b64": img_str,
+                        "video_url": u_video.strip(),
+                        "reporter": u_reporter,
+                        "editor": "Senior Desk Editor" if is_direct else "Awaiting Editor",
+                        "approved_by": "Head of App" if is_direct else "Pending",
+                        "views": 1
+                    }
+                    db["stories"].insert(0, new_story)
+                    save_db(db)
+                    if is_direct:
+                        st.success("✅ Published live simultaneously to DHRUVAA App & Web!")
+                    else:
+                        st.success("✅ Step 1 Complete! Sent to News Editor in Approval Center.")
+
+    # ---------------- 2. APPROVAL CENTER (వార్తల ఆమోదం) ----------------
+    elif sec == "Approval Center":
+        st.markdown("#### 🛡️ Approval Center • వార్తల ఆమోదం (Steps 2, 3 & 4)")
+        st.caption("Step 2: News Editor verifies & edits ➔ Step 3: Head of App grants final approval ➔ Step 4: Live on App & Web.")
+
+        for idx, story in enumerate(db["stories"]):
+            badge_color = "#15803d" if story["status"] == "Published" else ("#d97706" if story["status"] == "Pending Head Approval" else "#b91c1c")
+            with st.expander(f"[{story['status']}] {story['te_title'][:48]}...", expanded=(story["status"] != "Published")):
+                st.markdown(f"**Reporter:** {story.get('reporter')} | **Location:** {story.get('location')} | **Status:** `{story['status']}`")
+                ed_te_title = st.text_input("Edit Telugu Headline", value=story["te_title"], key=f"ed_tt_{story['id']}")
+                ed_te_body = st.text_area(
+                    f"Edit Telugu Summary ({word_count(story['te_summary'])}/160 words)",
+                    value=story["te_summary"],
+                    height=130,
+                    key=f"ed_tb_{story['id']}"
+                )
+                ed_en_title = st.text_input("Edit English Headline", value=story["en_title"], key=f"ed_et_{story['id']}")
+                ed_en_body = st.text_area(
+                    f"Edit English Summary ({word_count(story['en_summary'])}/160 words)",
+                    value=story["en_summary"],
+                    height=130,
+                    key=f"ed_eb_{story['id']}"
+                )
+
+                b1, b2, b3 = st.columns(3)
+                with b1:
+                    if st.button("✍️ Step 2: Editor Verify", key=f"step2_{story['id']}", use_container_width=True):
+                        db["stories"][idx]["te_title"] = ed_te_title
+                        db["stories"][idx]["te_summary"] = ed_te_body
+                        db["stories"][idx]["en_title"] = ed_en_title
+                        db["stories"][idx]["en_summary"] = ed_en_body
+                        db["stories"][idx]["editor"] = "Verified by News Editor"
+                        db["stories"][idx]["status"] = "Pending Head Approval"
+                        save_db(db)
+                        st.success("Forwarded to Head of App!")
+                        st.rerun()
+                with b2:
+                    if st.button("✅ Step 3&4: Head Approve & Live", type="primary", key=f"step3_{story['id']}", use_container_width=True):
+                        db["stories"][idx]["te_title"] = ed_te_title
+                        db["stories"][idx]["te_summary"] = ed_te_body
+                        db["stories"][idx]["en_title"] = ed_en_title
+                        db["stories"][idx]["en_summary"] = ed_en_body
+                        db["stories"][idx]["approved_by"] = "Head of App"
+                        db["stories"][idx]["status"] = "Published"
+                        save_db(db)
+                        st.success("Published live on App & Web!")
+                        st.rerun()
+                with b3:
+                    if st.button("🗑️ Delete", key=f"del_{story['id']}", use_container_width=True):
+                        db["stories"].pop(idx)
+                        save_db(db)
+                        st.rerun()
+
+    # ---------------- 3. STAFF MANAGEMENT (రిపోర్టర్ల నిర్వహణ) ----------------
+    elif sec == "Staff Management":
+        st.markdown("#### 👥 Staff Management • రిపోర్టర్ల నిర్వహణ")
+        with st.form("add_staff_form", clear_on_submit=True):
+            s_name = st.text_input("Staff Name")
+            s_role = st.selectbox("Role", ["Reporter", "News Editor", "Head of App"])
+            s_zone = st.text_input("Assigned District / Bureau", value="Telangana / AP")
+            if st.form_submit_button("➕ Add Staff Member", type="primary", use_container_width=True):
+                if s_name.strip():
+                    db["staff"].append({"name": s_name.strip(), "role": s_role, "zone": s_zone.strip(), "active": True})
+                    save_db(db)
+                    st.success(f"Added {s_name} ({s_role})")
+                    st.rerun()
+
+        for i, m in enumerate(db["staff"]):
+            c1, c2 = st.columns([3, 1])
+            with c1:
+                st.markdown(f"**{m['name']}** — `{m['role']}` ({m['zone']})")
+            with c2:
+                if st.button("Remove", key=f"rm_staff_{i}"):
+                    db["staff"].pop(i)
+                    save_db(db)
+                    st.rerun()
+
+    # ---------------- 4. ADVERTISEMENTS (ప్రకటనల నిర్వహణ) ----------------
+    elif sec == "Advertisements":
+        st.markdown("#### 📣 Advertisements • ప్రకటనల నిర్వహణ")
+        with st.form("add_ad_form", clear_on_submit=True):
+            ad_sponsor = st.text_input("Sponsor / Business Name")
+            ad_tagline = st.text_input("Ad Text / Offer Details")
+            ad_link = st.text_input("Target URL / WhatsApp Link", value="https://dhruvaa-news.streamlit.app")
+            ad_banner = st.file_uploader("Banner Image (Optional)", type=["jpg", "jpeg", "png"])
+            if st.form_submit_button("➕ Publish Ad on Feed", type="primary", use_container_width=True):
+                if ad_sponsor.strip() and ad_tagline.strip():
+                    b_img = image_to_base64(ad_banner, max_width=800) if ad_banner else ""
+                    db["ads"].insert(0, {
+                        "id": int(datetime.datetime.now().timestamp()),
+                        "sponsor": ad_sponsor.strip(),
+                        "tagline": ad_tagline.strip(),
+                        "link": ad_link.strip(),
+                        "image_b64": b_img,
+                        "active": True
+                    })
+                    save_db(db)
+                    st.success("Ad live across news cards!")
+                    st.rerun()
+
+        for i, ad in enumerate(db["ads"]):
+            c1, c2 = st.columns([3, 1])
+            with c1:
+                st.markdown(f"**{ad['sponsor']}**: {ad['tagline']}")
+            with c2:
+                if st.button("Delete", key=f"del_ad_{i}"):
+                    db["ads"].pop(i)
+                    save_db(db)
+                    st.rerun()
+
+    # ---------------- 5. E-PAPER (రోజువారీ పేపర్) ----------------
+    elif sec == "E-Paper":
+        st.markdown("#### 📖 E-Paper Management • రోజువారీ పేపర్")
+        with st.form("epaper_form"):
+            ep_title = st.text_input("Edition Title", value=db["epaper"].get("edition_title", ""))
+            ep_highlights = st.text_area("Today's Front-Page Highlights", value=db["epaper"].get("highlights", ""))
+            ep_link = st.text_input("Full PDF / Google Drive Link", value=db["epaper"].get("pdf_or_drive_link", ""))
+            ep_img = st.file_uploader("Upload Front Page Image (JPG/PNG)", type=["jpg", "jpeg", "png"])
+            if st.form_submit_button("💾 Update Daily E-Paper", type="primary", use_container_width=True):
+                db["epaper"]["edition_title"] = ep_title
+                db["epaper"]["highlights"] = ep_highlights
+                db["epaper"]["pdf_or_drive_link"] = ep_link
+                if ep_img:
+                    db["epaper"]["page_image_b64"] = image_to_base64(ep_img, max_width=1200)
+                save_db(db)
+                st.success("✅ E-Paper updated live!")
+
+    # ---------------- 6. YOUTUBE & LIVE (వీడియోలు, లైవ్) ----------------
+    elif sec == "YouTube & Live":
+        st.markdown("#### ▶️ YouTube & Live • వీడియోలు, లైవ్")
+        with st.form("yt_live_form"):
+            yt_title = st.text_input("Channel / Live Stream Title", value=db["youtube_live"].get("channel_title", ""))
+            yt_url = st.text_input("YouTube Live or Video URL", value=db["youtube_live"].get("live_url", ""))
+            yt_tick = st.text_input("Live Scrolling Ticker", value=db["youtube_live"].get("ticker", ""))
+            if st.form_submit_button("💾 Update Live Stream", type="primary", use_container_width=True):
+                db["youtube_live"]["channel_title"] = yt_title
+                db["youtube_live"]["live_url"] = yt_url
+                db["youtube_live"]["ticker"] = yt_tick
+                save_db(db)
+                st.success("✅ YouTube & Live settings updated!")
+
+    # ---------------- 7. NOTIFICATIONS (బ్రేకింగ్ అలర్ట్స్) ----------------
+    elif sec == "Notifications":
+        st.markdown("#### 🔔 Notifications • బ్రేకింగ్ అలర్ట్స్")
+        with st.form("notif_form", clear_on_submit=True):
+            n_title = st.text_input("Breaking Alert Headline", placeholder="🔴 BREAKING: ...")
+            n_msg = st.text_area("Alert Details", height=80)
+            if st.form_submit_button("📢 Broadcast Breaking Alert", type="primary", use_container_width=True):
+                if n_title.strip():
+                    db["notifications"].insert(0, {
+                        "id": int(datetime.datetime.now().timestamp()),
+                        "time": datetime.datetime.now().strftime("%d %b %Y • %I:%M %p"),
+                        "title": n_title.strip(),
+                        "message": n_msg.strip()
+                    })
+                    save_db(db)
+                    st.success("✅ Breaking Alert pushed to top ticker!")
+                    st.rerun()
+
+        for n in db.get("notifications", [])[:10]:
+            st.markdown(f"- **{n['title']}** ({n['time']}) — {n['message']}")
+
+    # ---------------- 8. REPORTS (వీక్షణలు, గణాంకాలు) ----------------
+    elif sec == "Reports":
+        st.markdown("#### 📈 Reports • వీక్షణలు, గణాంకాలు")
+        total_stories = len(db["stories"])
+        pub_stories = len([s for s in db["stories"] if s["status"] == "Published"])
+        pend_editor = len([s for s in db["stories"] if s["status"] == "Pending Editor"])
+        pend_head = len([s for s in db["stories"] if s["status"] == "Pending Head Approval"])
+        total_views = sum(s.get("views", 0) for s in db["stories"])
+
+        m1, m2, m3 = st.columns(3)
+        m1.metric("Published Live", pub_stories)
+        m2.metric("In Approval Queue", pend_editor + pend_head)
+        m3.metric("Total Readers", f"{total_views:,}")
+
+        st.markdown("**Workflow Status Breakdown:**")
+        st.write(f"- Step 1/2 (Awaiting News Editor): **{pend_editor}**")
+        st.write(f"- Step 3 (Awaiting Head of App): **{pend_head}**")
+        st.write(f"- Step 4 (Live on App & Web): **{pub_stories}** of {total_stories} total stories")
