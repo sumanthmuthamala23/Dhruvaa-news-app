@@ -1,22 +1,34 @@
 {
+  "id": "/Dhruvaa-news-app/",
   "name": "DHRUVAA News - ధ్రువ న్యూస్",
   "short_name": "DHRUVAA News",
   "description": "Fast Short Telugu & English News App",
   "start_url": "./index.html",
+  "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#0f172a",
   "theme_color": "#b91c1c",
   "icons": [
     {
-      "src": "DHRUVAA.jpg",
+      "src": "dhruva logo.png",
       "sizes": "192x192",
-      "type": "image/jpeg"
+      "type": "image/png",
+      "purpose": "any"
     },
     {
-      "src": "DHRUVAA.jpg",
+      "src": "dhruva logo.png",
       "sizes": "512x512",
-      "type": "image/jpeg"
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "dhruva logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "form_factor": "narrow"
     }
   ]
 }
