@@ -2,6 +2,7 @@ import os
 import io
 import json
 import base64
+import hashlib
 import datetime
 import urllib.parse
 import requests
@@ -19,17 +20,18 @@ st.set_page_config(
 
 DATA_FILE = "dhruvaa_cms_db.json"
 
-# ----------------- HELPER FUNCTIONS -----------------
+# ----------------- SECURITY & HELPER FUNCTIONS -----------------
+def hash_password(password: str) -> str:
+    return hashlib.sha256(password.strip().encode("utf-8")).hexdigest()
+
 def load_logo_base64() -> str:
-    """Loads DHRUVAA logo from repository root if uploaded."""
-    for fname in ["DHRUVAA.jpg", "DHRUVAA.png", "dhruvaa.jpg", "dhruvaa.png", "DHRUVAA NEWS.jpg"]:
+    for fname in ["dhruva logo.png", "DHRUVAA.png", "DHRUVAA.jpg", "dhruvaa.png", "dhruvaa.jpg", "DHRUVAA NEWS.jpg"]:
         if os.path.exists(fname):
             with open(fname, "rb") as f:
                 return base64.b64encode(f.read()).decode("utf-8")
     return ""
 
 def image_to_base64(uploaded_file, max_width=1080) -> str:
-    """Compresses uploaded mobile photos for fast 4G/5G loading."""
     img = Image.open(uploaded_file).convert("RGB")
     if img.width > max_width:
         ratio = max_width / float(img.width)
@@ -43,7 +45,6 @@ def word_count(text: str) -> int:
     return len([w for w in text.strip().split() if w])
 
 def transliterate_to_telugu(text: str) -> str:
-    """Free, unlimited phonetic Tanglish-to-Telugu converter (no API key needed)."""
     if not text.strip():
         return ""
     lines = text.split("\n")
@@ -70,8 +71,29 @@ def transliterate_to_telugu(text: str) -> str:
         converted_lines.append(" ".join(out_words))
     return "\n".join(converted_lines)
 
+def auto_translate_text(text: str, target_lang: str) -> str:
+    """Free sentence-by-sentence translator between Telugu ('te') and English ('en')."""
+    if not text.strip():
+        return ""
+    clean_text = text.replace("*", "").strip()
+    sentences = [s.strip() for s in clean_text.split("\n") if s.strip()]
+    translated_parts = []
+    headers = {"User-Agent": "Mozilla/5.0"}
+    for sent in sentences:
+        try:
+            url = (
+                f"https://translate.googleapis.com/translate_a/single?client=gtx"
+                f"&sl=auto&tl={target_lang}&dt=t&q={urllib.parse.quote(sent)}"
+            )
+            res = requests.get(url, headers=headers, timeout=5)
+            data = res.json()
+            chunk = "".join([part[0] for part in data[0] if part[0]])
+            translated_parts.append(chunk)
+        except Exception:
+            translated_parts.append(sent)
+    return "\n".join(translated_parts)
+
 def get_youtube_embed_url(url: str) -> str:
-    """Converts standard YouTube / Live / Shorts URLs into embeddable player URLs."""
     u = url.strip()
     if "youtube.com/watch?v=" in u:
         vid = u.split("watch?v=")[1].split("&")[0]
@@ -98,39 +120,28 @@ def get_default_db():
                 "location": "హైదరాబాద్ / HYDERABAD",
                 "time": f"{today_str} • Live",
                 "te_title": "ప్రజా సమస్యల సత్వర పరిష్కారానికి ప్రత్యేక డిజిటల్ వేదిక ప్రారంభం",
-                "te_summary": "పట్టణ మరియు గ్రామీణ ప్రాంతాల్లోని మౌలిక వసతుల సమస్యలను తక్షణమే అధికారుల దృష్టికి తీసుకెళ్లేందుకు కొత్త డిజిటల్ కార్యాచరణ అమల్లోకి వచ్చింది. తాగునీరు, రహదారులు, విద్యుత్ సరఫరా మరియు పారిశుద్ధ్య ఫిర్యాదులపై 24 గంటల్లో స్పందించాలని ఉన్నతాధికారులు స్పష్టమైన ఆదేశాలు జారీ చేశారు. ప్రతి మండల కేంద్రంలో ప్రత్యేక పర్యవేక్షణ అధికారిని నియమించి, ప్రజల నుండి వచ్చే వినతులను ఎప్పటికప్పుడు సమీక్షించనున్నారు. క్షేత్రస్థాయిలో పనుల నాణ్యతను తనిఖీ చేసేందుకు ప్రత్యేక బృందాలు పర్యటిస్తాయని, నిర్లక్ష్యం వహించే సిబ్బందిపై కఠిన చర్యలు తీసుకుంటామని అధికారులు హెచ్చరించారు. ఈ డిజిటల్ వేదిక ద్వారా సామాన్య ప్రజలకు కార్యాలయాల చుట్టూ తిరిగే ఇబ్బంది తప్పి, పారదర్శకంగా సేవలు అందుతాయని పలువురు హర్షం వ్యక్తం చేస్తున్నారు.",
+                "te_summary": "పట్టణ మరియు గ్రామీణ ప్రాంతాల్లోని మౌలిక వసతుల సమస్యలను తక్షణమే అధికారుల దృష్టికి తీసుకెళ్లేందుకు కొత్త డిజిటల్ కార్యాచరణ అమల్లోకి వచ్చింది. తాగునీరు, రహదారులు, విద్యుత్ సరఫరా మరియు పారిశుద్ధ్య ఫిర్యాదులపై 24 గంటల్లో స్పందించాలని ఉన్నతాధికారులు స్పష్టమైన ఆదేశాలు జారీ చేశారు. ప్రతి మండల కేంద్రంలో ప్రత్యేక పర్యవేక్షణ అధికారిని నియమించి, ప్రజల నుండి వచ్చే వినతులను ఎప్పటికప్పుడు సమీక్షించనున్నారు. క్షేత్రస్థాయిలో పనుల నాణ్యతను తనిఖీ చేసేందుకు ప్రత్యేక బృందాలు పర్యటిస్తాయని, నిర్లక్ష్యం వహించే సిబ్బందిపై కఠిన చర్యలు తీసుకుంటామని అధికారులు హెచ్చరించారు.",
                 "en_title": "Special Digital Grievance Redressal Drive Launched Across All Mandals",
-                "en_summary": "Authorities have rolled out a rapid-response digital mechanism to resolve civic and infrastructure complaints across urban and rural mandals within 24 hours. Priority is being accorded to drinking water supply, road repairs, uninterrupted electricity, and sanitation works. Dedicated nodal officers have been appointed at every mandal headquarters to monitor incoming petitions in real time and ensure transparent follow-up. Special inspection squads will conduct surprise field visits to verify the quality of ongoing civil works, with strict disciplinary action warned against administrative negligence. Citizens and local representatives welcomed the initiative, noting that the unified digital portal eliminates repeated visits to government offices and accelerates grassroots accountability.",
+                "en_summary": "Authorities have rolled out a rapid-response digital mechanism to resolve civic and infrastructure complaints across urban and rural mandals within 24 hours. Priority is being accorded to drinking water supply, road repairs, uninterrupted electricity, and sanitation works. Dedicated nodal officers have been appointed at every mandal headquarters to monitor incoming petitions in real time and ensure transparent follow-up. Special inspection squads will conduct surprise field visits to verify the quality of ongoing civil works, with strict disciplinary action warned against administrative negligence.",
                 "image_b64": "",
                 "video_url": "",
                 "reporter": "DHRUVAA State Bureau",
+                "reporter_user": "admin",
                 "editor": "Senior Desk Editor",
-                "approved_by": "Head of App",
+                "approved_by": "Admin (Head of App)",
                 "views": 1420
-            },
-            {
-                "id": 1002,
-                "status": "Published",
-                "category": "STATE • రాష్ట్రం",
-                "location": "తెలంగాణ & ఏపీ / TS & AP",
-                "time": f"{today_str} • 1 hr ago",
-                "te_title": "వ్యవసాయ మార్కెట్ యార్డుల్లో కొనుగోళ్ల వేగవంతం: రైతులకు భరోసా",
-                "te_summary": "వ్యవసాయ మార్కెట్ యార్డుల్లో ధాన్యం మరియు పత్తి కొనుగోలు కేంద్రాలను పూర్తిస్థాయిలో సిద్ధం చేసినట్లు వ్యవసాయ శాఖ అధికారులు ప్రకటించారు. రైతులకు కనీస మద్దతు ధర అందేలా ప్రత్యేక పర్యవేక్షణ బృందాలను ఏర్పాటు చేశారు. తేమ శాతం పరిశీలన, తూకం ప్రక్రియలో ఎలాంటి జాప్యం లేకుండా తక్షణమే రశీదులు జారీ చేయాలని సిబ్బందికి సూచించారు. కొనుగోలు చేసిన 48 గంటల్లోనే రైతుల బ్యాంకు ఖాతాల్లో నేరుగా నగదు జమ అయ్యేలా చర్యలు తీసుకుంటున్నామని తెలిపారు. వర్షాల దృష్ట్యా మార్కెట్ యార్డుల్లో సరిపడా టార్పాలిన్లు, గోనె సంచులు మరియు తాగునీటి వసతిని అందుబాటులో ఉంచారు.",
-                "en_title": "Procurement Centers Geared Up Across Market Yards to Ensure Swift Payments",
-                "en_summary": "Agriculture officials confirmed that grain and cotton procurement centers are fully operational across major market yards with dedicated monitoring teams to guarantee minimum support price for farmers. Staff have been instructed to complete moisture testing and weighment without delay and issue digital receipts on the spot. Officials assured that direct bank transfers will be credited into farmers' accounts within 48 hours of procurement. In view of unseasonal weather forecasts, adequate tarpaulins, gunny bags, and drinking water facilities have been stocked at all rural purchase centers.",
-                "image_b64": "",
-                "video_url": "",
-                "reporter": "DHRUVAA Agri Desk",
-                "editor": "Senior Desk Editor",
-                "approved_by": "Head of App",
-                "views": 985
             }
         ],
-        "staff": [
-            {"name": "Sumanth Muthamala", "role": "Head of App", "zone": "State Headquarters", "active": True},
-            {"name": "Ramesh Kumar", "role": "News Editor", "zone": "Central Desk", "active": True},
-            {"name": "Karthik Reddy", "role": "Reporter", "zone": "Hyderabad / Khammam", "active": True},
-            {"name": "Anitha Rao", "role": "Reporter", "zone": "Vijayawada / Warangal", "active": True}
+        # Admin-controlled login accounts ONLY (No public registration)
+        "users": [
+            {
+                "username": "admin",
+                "password_hash": hash_password("Dhruvaa@2026"),
+                "full_name": "Sumanth Muthamala (Admin)",
+                "role": "Admin",
+                "zone": "State Headquarters",
+                "active": True
+            }
         ],
         "ads": [
             {
@@ -169,6 +180,8 @@ def load_db():
             with open(DATA_FILE, "r", encoding="utf-8") as f:
                 data = json.load(f)
                 if isinstance(data, dict) and "stories" in data:
+                    if "users" not in data or not data["users"]:
+                        data["users"] = get_default_db()["users"]
                     return data
         except Exception:
             pass
@@ -176,7 +189,7 @@ def load_db():
 
 def save_db(db_data):
     try:
-        db_data["stories"] = db_data["stories"][:80]
+        db_data["stories"] = db_data["stories"][:100]
         with open(DATA_FILE, "w", encoding="utf-8") as f:
             json.dump(db_data, f, ensure_ascii=False, indent=2)
     except Exception:
@@ -187,6 +200,8 @@ if "cms_db" not in st.session_state:
     st.session_state.cms_db = load_db()
 if "card_idx" not in st.session_state:
     st.session_state.card_idx = 0
+if "auth_user" not in st.session_state:
+    st.session_state.auth_user = None  # Dict: {username, full_name, role, zone}
 if "cms_section" not in st.session_state:
     st.session_state.cms_section = "News Upload"
 
@@ -257,35 +272,12 @@ st.markdown("""
         font-weight: 700;
         margin-bottom: 8px;
     }
-    .workflow-box {
+    .login-card {
         background: #ffffff;
         border: 1px solid #e2e8f0;
-        border-radius: 12px;
-        padding: 12px 14px;
-        margin-top: 10px;
-    }
-    .wf-step {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        padding: 5px 0;
-        font-size: 13.5px;
-        font-weight: 600;
-        color: #1e293b;
-    }
-    .wf-num {
-        background: #f1f5f9;
-        color: #0f172a;
-        border: 1px solid #cbd5e1;
-        width: 24px;
-        height: 24px;
-        border-radius: 50%;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 12px;
-        font-weight: 800;
-        flex-shrink: 0;
+        border-radius: 14px;
+        padding: 18px;
+        box-shadow: 0 6px 20px rgba(15, 23, 42, 0.08);
     }
     div.stButton > button {
         border-radius: 11px !important;
@@ -304,13 +296,14 @@ db = st.session_state.cms_db
 # ----------------- TOP MOBILE APP HEADER -----------------
 logo_b64 = load_logo_base64()
 logo_inline = (
-    f'<img src="data:image/jpeg;base64,{logo_b64}" style="height:36px; border-radius:6px; background:#fff; padding:2px;">'
+    f'<img src="data:image/png;base64,{logo_b64}" style="height:36px; border-radius:6px; background:#fff; padding:2px;">'
     if logo_b64 else
     '<div class="dhruvaa-badge">DN</div>'
 )
 
 pending_count = len([s for s in db["stories"] if s["status"] != "Published"])
-notif_count = len(db.get("notifications", []))
+auth = st.session_state.auth_user
+cms_tab_label = f"🔐 Staff Login" if not auth else f"🎛️ {auth['role']} Desk ({pending_count})"
 
 st.markdown(f"""
 <div class="dhruvaa-topbar">
@@ -329,7 +322,6 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# Breaking Alert Ticker
 latest_ticker = db["notifications"][0]["title"] if db.get("notifications") else db["youtube_live"]["ticker"]
 st.markdown(f'<div class="ticker-strip">🔔 {latest_ticker}</div>', unsafe_allow_html=True)
 
@@ -338,10 +330,10 @@ nav_reader, nav_epaper, nav_live, nav_cms = st.tabs([
     "📱 News Feed",
     "📰 E-Paper",
     "📺 YouTube Live",
-    f"🎛️ CMS ({pending_count})"
+    cms_tab_label
 ])
 
-# ================= TAB 1: LIVE PUBLISHED 160-WORD NEWS FEED =================
+# ================= TAB 1: PUBLIC READER NEWS FEED (NO LOGIN REQUIRED) =================
 with nav_reader:
     published_stories = [s for s in db["stories"] if s["status"] == "Published"]
 
@@ -364,7 +356,7 @@ with nav_reader:
     )
 
     if not filtered_feed:
-        st.info("No published stories in this category yet. Approve stories in CMS ➔ Approval Center.")
+        st.info("No published stories in this category yet.")
     else:
         total_cards = len(filtered_feed)
         if st.session_state.card_idx >= total_cards:
@@ -372,7 +364,6 @@ with nav_reader:
 
         item = filtered_feed[st.session_state.card_idx]
 
-        # Active Sponsor Ad Banner (from Advertisements Module)
         active_ads = [a for a in db.get("ads", []) if a.get("active")]
         ad_banner_html = ""
         if active_ads:
@@ -560,7 +551,7 @@ with nav_reader:
                 st.session_state.card_idx = (st.session_state.card_idx + 1) % total_cards
                 st.rerun()
 
-# ================= TAB 2: E-PAPER READER (రోజువారీ పేపర్) =================
+# ================= TAB 2: E-PAPER READER =================
 with nav_epaper:
     ep = db.get("epaper", {})
     st.markdown(f"### 📰 {ep.get('edition_title', 'DHRUVAA Daily E-Paper')}")
@@ -573,9 +564,9 @@ with nav_epaper:
     if ep.get("pdf_or_drive_link"):
         st.link_button("📥 Open / Download Full E-Paper PDF", ep["pdf_or_drive_link"], type="primary", use_container_width=True)
     elif not ep.get("page_image_b64"):
-        st.caption("Upload today's E-Paper front page or PDF link inside **CMS ➔ E-Paper**.")
+        st.caption("Admin can upload today's E-Paper front page or PDF link inside the Admin Desk.")
 
-# ================= TAB 3: YOUTUBE & LIVE (వీడియోలు, లైవ్) =================
+# ================= TAB 3: YOUTUBE & LIVE =================
 with nav_live:
     yt = db.get("youtube_live", {})
     st.markdown(f"### 📺 {yt.get('channel_title', 'DHRUVAA NEWS LIVE')}")
@@ -588,7 +579,6 @@ with nav_live:
     elif yt.get("live_url"):
         st.link_button("▶ Open YouTube Live Stream", yt["live_url"], type="primary", use_container_width=True)
 
-    # Also list video news stories
     video_stories = [s for s in db["stories"] if s["status"] == "Published" and s.get("video_url")]
     if video_stories:
         st.markdown("#### 🎬 Recent Video Bulletins")
@@ -596,327 +586,440 @@ with nav_live:
             st.markdown(f"**{vs['te_title']}** ({vs['location']})")
             st.link_button("▶ Watch Video", vs["video_url"], use_container_width=True)
 
-# ================= TAB 4: DHRUVA NEWS CONTENT MANAGEMENT SYSTEM (CMS) =================
+# ================= TAB 4: AUTHENTICATED CMS & ADMIN PORTAL =================
 with nav_cms:
-    st.markdown("""
-    <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:12px; padding:12px 14px; margin-bottom:10px;">
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-            <div>
-                <div style="font-size:17px; font-weight:800; color:#0f172a;">DHRUVA NEWS</div>
-                <div style="font-size:11px; font-weight:700; color:#64748b; letter-spacing:0.6px;">CONTENT MANAGEMENT SYSTEM</div>
+    # ---------- A. LOGIN SCREEN (STRICTLY ADMIN-ISSUED ACCOUNTS ONLY) ----------
+    if not st.session_state.auth_user:
+        st.markdown("""
+        <div class="login-card">
+            <div style="font-size:18px; font-weight:800; color:#0f172a; margin-bottom:4px;">🔐 DHRUVAA Editorial & Admin Login</div>
+            <div style="font-size:12.5px; color:#64748b; margin-bottom:12px;">
+                Authorized Staff & Admin Access Only. New staff logins are issued exclusively by the Administrator.
             </div>
-            <span style="background:#dcfce7; color:#15803d; font-size:11px; font-weight:800; padding:4px 10px; border-radius:20px;">
-                CMS Active
-            </span>
         </div>
-    </div>
-    """, unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
 
-    # 8-Tile CMS Dashboard Grid (Matching Reference Layout)
-    r1c1, r1c2 = st.columns(2)
-    with r1c1:
-        if st.button("📰 News Upload\nవార్తల ప్రచురణ", use_container_width=True):
-            st.session_state.cms_section = "News Upload"
-    with r1c2:
-        if st.button("👥 Staff Management\nరిపోర్టర్ల నిర్వహణ", use_container_width=True):
-            st.session_state.cms_section = "Staff Management"
+        with st.form("staff_login_form"):
+            l_user = st.text_input("Username", placeholder="Enter your assigned username")
+            l_pass = st.text_input("Password", type="password", placeholder="Enter your password")
+            login_btn = st.form_submit_button("🔓 Sign In to DHRUVAA Desk", type="primary", use_container_width=True)
 
-    r2c1, r2c2 = st.columns(2)
-    with r2c1:
-        if st.button(f"🛡️ Approval Center ({pending_count})\nవార్తల ఆమోదం", use_container_width=True):
-            st.session_state.cms_section = "Approval Center"
-    with r2c2:
-        if st.button("📣 Advertisements\nప్రకటనల నిర్వహణ", use_container_width=True):
-            st.session_state.cms_section = "Advertisements"
+            if login_btn:
+                matched_user = None
+                for u in db["users"]:
+                    if u["username"].lower() == l_user.strip().lower() and u["password_hash"] == hash_password(l_pass):
+                        matched_user = u
+                        break
 
-    r3c1, r3c2 = st.columns(2)
-    with r3c1:
-        if st.button("📖 E-Paper\nరోజువారీ పేపర్", use_container_width=True):
-            st.session_state.cms_section = "E-Paper"
-    with r3c2:
-        if st.button("▶️ YouTube & Live\nవీడియోలు, లైవ్", use_container_width=True):
-            st.session_state.cms_section = "YouTube & Live"
-
-    r4c1, r4c2 = st.columns(2)
-    with r4c1:
-        if st.button("🔔 Notifications\nబ్రేకింగ్ అలర్ట్స్", use_container_width=True):
-            st.session_state.cms_section = "Notifications"
-    with r4c2:
-        if st.button("📈 Reports\nవీక్షణలు, గణాంకాలు", use_container_width=True):
-            st.session_state.cms_section = "Reports"
-
-    # 4-Step Publishing Workflow Card (వార్త ప్రచురణ విధానం)
-    st.markdown("""
-    <div class="workflow-box">
-        <div style="font-size:15px; font-weight:800; color:#0f172a; margin-bottom:6px;">వార్త ప్రచురణ విధానం (Publishing Workflow)</div>
-        <div class="wf-step"><span class="wf-num">1</span> రిపోర్టర్ వార్త, ఫోటో, వీడియో పంపిస్తారు.</div>
-        <div class="wf-step"><span class="wf-num">2</span> న్యూస్ ఎడిటర్ పరిశీలించి సవరించుతారు.</div>
-        <div class="wf-step"><span class="wf-num">3</span> Head of App తుది అనుమతి ఇస్తారు.</div>
-        <div class="wf-step"><span class="wf-num">4</span> ఒకేసారి యాప్, వెబ్‌సైట్‌లో ప్రచురితమవుతుంది.</div>
-    </div>
-    """, unsafe_allow_html=True)
-
-    st.divider()
-    sec = st.session_state.cms_section
-
-    # ---------------- 1. NEWS UPLOAD (160 WORDS) ----------------
-    if sec == "News Upload":
-        st.markdown("#### 📰 News Upload • వార్తల ప్రచురణ (160-Word Standard)")
-
-        with st.expander("🔤 Free Tanglish ➔ Telugu Converter (Unlimited)", expanded=False):
-            t_in = st.text_input("Type Telugu in English letters:", placeholder="e.g., Nedu Hyderabad lo pratyeka samavesam jarigindi")
-            if st.button("Convert to Telugu"):
-                if t_in.strip():
-                    st.code(transliterate_to_telugu(t_in), language=None)
-
-        active_reporters = [m["name"] for m in db["staff"] if m.get("active")] or ["DHRUVAA Reporter"]
-
-        with st.form("cms_news_upload_form", clear_on_submit=True):
-            u_reporter = st.selectbox("1. Reporter Name (రిపోర్టర్)", active_reporters)
-            u_cat = st.selectbox(
-                "Category",
-                [
-                    "BREAKING • తాజా వార్త",
-                    "POLITICS • రాజకీయం",
-                    "DISTRICT • జిల్లా వార్తలు",
-                    "STATE • రాష్ట్రం",
-                    "SPORTS • క్రీడలు",
-                    "CINEMA • సినిమా",
-                    "TECH & YOUTH • యువత"
-                ]
-            )
-            u_loc = st.text_input("Location / Mandal / District", value="హైదరాబాద్ / HYDERABAD")
-            u_photo = st.file_uploader("📸 Attach News Photo", type=["jpg", "jpeg", "png", "webp"])
-            u_video = st.text_input("🎬 Video Link (YouTube / Drive / Reel URL)", placeholder="https://...")
-
-            u_te_title = st.text_input("తెలుగు హెడ్‌లైన్ (Telugu Headline)")
-            u_te_body = st.text_area("తెలుగు వార్త (Up to 160 Words Summary)", height=150)
-
-            u_en_title = st.text_input("English Headline")
-            u_en_body = st.text_area("English News Summary (Up to 160 Words)", height=150)
-
-            publish_mode = st.radio(
-                "Submission Routing",
-                [
-                    "Submit via 4-Step Workflow (Step 1 ➔ News Editor Review)",
-                    "Direct Head of App Publish (Instant App & Web Live)"
-                ]
-            )
-
-            if st.form_submit_button("🚀 Submit Story to DHRUVAA CMS", type="primary", use_container_width=True):
-                if not u_te_title.strip() and not u_en_title.strip():
-                    st.error("Please enter at least a Telugu or English headline.")
+                if not matched_user:
+                    st.error("❌ Invalid username or password.")
+                elif not matched_user.get("active", True):
+                    st.error("⛔ Your account has been suspended by the Admin.")
                 else:
-                    te_wc = word_count(u_te_body)
-                    en_wc = word_count(u_en_body)
-                    if te_wc > 175 or en_wc > 175:
-                        st.warning(f"Note: Word count is {max(te_wc, en_wc)} words (recommended max: 160 words).")
-
-                    img_str = image_to_base64(u_photo) if u_photo is not None else ""
-                    now_time = datetime.datetime.now().strftime("%d %b %Y • %I:%M %p")
-                    is_direct = "Direct Head of App" in publish_mode
-
-                    new_story = {
-                        "id": int(datetime.datetime.now().timestamp()),
-                        "status": "Published" if is_direct else "Pending Editor",
-                        "category": u_cat,
-                        "location": u_loc.strip() or "DHRUVAA Bureau",
-                        "time": now_time,
-                        "te_title": u_te_title.strip() or u_en_title.strip(),
-                        "te_summary": u_te_body.strip() or u_en_body.strip(),
-                        "en_title": u_en_title.strip() or u_te_title.strip(),
-                        "en_summary": u_en_body.strip() or u_te_body.strip(),
-                        "image_b64": img_str,
-                        "video_url": u_video.strip(),
-                        "reporter": u_reporter,
-                        "editor": "Senior Desk Editor" if is_direct else "Awaiting Editor",
-                        "approved_by": "Head of App" if is_direct else "Pending",
-                        "views": 1
+                    st.session_state.auth_user = {
+                        "username": matched_user["username"],
+                        "full_name": matched_user["full_name"],
+                        "role": matched_user["role"],
+                        "zone": matched_user.get("zone", "State")
                     }
-                    db["stories"].insert(0, new_story)
-                    save_db(db)
-                    if is_direct:
-                        st.success("✅ Published live simultaneously to DHRUVAA App & Web!")
+                    st.session_state.cms_section = "News Upload"
+                    st.rerun()
+
+        st.caption("Default Master Admin — Username: `admin` | Password: `Dhruvaa@2026` (Change in Staff Management after first login)")
+
+    # ---------- B. LOGGED-IN ROLE-BASED DASHBOARD ----------
+    else:
+        role = auth["role"]  # 'Admin', 'News Editor', or 'Reporter'
+
+        # Logged-In Header Bar + Logout
+        h_col1, h_col2 = st.columns([2.6, 1])
+        with h_col1:
+            st.markdown(f"**👤 {auth['full_name']}** (`{role}` • {auth['zone']})")
+        with h_col2:
+            if st.button("🚪 Logout", use_container_width=True):
+                st.session_state.auth_user = None
+                st.rerun()
+
+        # Role-Filtered Navigation Tiles
+        if role == "Admin":
+            r1c1, r1c2 = st.columns(2)
+            with r1c1:
+                if st.button("📰 News Upload\nవార్తల ప్రచురణ", use_container_width=True):
+                    st.session_state.cms_section = "News Upload"
+            with r1c2:
+                if st.button("🔐 Staff & Logins\nసిబ్బంది లాగిన్ నియంత్రణ", use_container_width=True):
+                    st.session_state.cms_section = "Staff Management"
+
+            r2c1, r2c2 = st.columns(2)
+            with r2c1:
+                if st.button(f"🛡️ Approval Center ({pending_count})\nవార్తల ఆమోదం", use_container_width=True):
+                    st.session_state.cms_section = "Approval Center"
+            with r2c2:
+                if st.button("📣 Advertisements\nప్రకటనల నిర్వహణ", use_container_width=True):
+                    st.session_state.cms_section = "Advertisements"
+
+            r3c1, r3c2 = st.columns(2)
+            with r3c1:
+                if st.button("📖 E-Paper\nరోజువారీ పేపర్", use_container_width=True):
+                    st.session_state.cms_section = "E-Paper"
+            with r3c2:
+                if st.button("▶️ YouTube & Live\nవీడియోలు, లైవ్", use_container_width=True):
+                    st.session_state.cms_section = "YouTube & Live"
+
+            r4c1, r4c2 = st.columns(2)
+            with r4c1:
+                if st.button("🔔 Notifications\nబ్రేకింగ్ అలర్ట్స్", use_container_width=True):
+                    st.session_state.cms_section = "Notifications"
+            with r4c2:
+                if st.button("📈 Reports\nవీక్షణలు, గణాంకాలు", use_container_width=True):
+                    st.session_state.cms_section = "Reports"
+
+        elif role == "News Editor":
+            e1, e2 = st.columns(2)
+            with e1:
+                if st.button("📰 News Upload\nవార్తల ప్రచురణ", use_container_width=True):
+                    st.session_state.cms_section = "News Upload"
+            with e2:
+                if st.button(f"🛡️ Editor Verification ({pending_count})\nవార్తల పరిశీలన", use_container_width=True):
+                    st.session_state.cms_section = "Approval Center"
+
+        else:  # Reporter
+            rep1, rep2 = st.columns(2)
+            with rep1:
+                if st.button("📰 Submit News\nవార్త పంపండి", use_container_width=True):
+                    st.session_state.cms_section = "News Upload"
+            with rep2:
+                if st.button("📋 My Submissions\nనా వార్తల స్థితి", use_container_width=True):
+                    st.session_state.cms_section = "My Submissions"
+
+        st.divider()
+        sec = st.session_state.cms_section
+
+        # ---------------- 1. NEWS UPLOAD (ALL ROLES) ----------------
+        if sec == "News Upload":
+            st.markdown("#### 📰 News Upload • వార్తల ప్రచురణ (Up to 160 Words)")
+
+            with st.expander("🔤 Free Tanglish ➔ Telugu & Two-Way Auto-Translator", expanded=False):
+                t_in = st.text_input("Tanglish to Telugu:", placeholder="e.g., Nedu Hyderabad lo pratyeka samavesam jarigindi")
+                if st.button("Convert Tanglish ➔ Telugu"):
+                    if t_in.strip():
+                        st.code(transliterate_to_telugu(t_in), language=None)
+
+                tr_src = st.text_area("Paste Telugu OR English text to auto-translate:", height=80)
+                tr1, tr2 = st.columns(2)
+                with tr1:
+                    if st.button("Translate ➔ English", use_container_width=True):
+                        if tr_src.strip():
+                            st.code(auto_translate_text(tr_src, "en"), language=None)
+                with tr2:
+                    if st.button("Translate ➔ తెలుగు", use_container_width=True):
+                        if tr_src.strip():
+                            st.code(auto_translate_text(tr_src, "te"), language=None)
+
+            with st.form("cms_news_upload_form", clear_on_submit=True):
+                st.text_input("Reporter Name", value=auth["full_name"], disabled=True)
+                u_cat = st.selectbox(
+                    "Category",
+                    [
+                        "BREAKING • తాజా వార్త",
+                        "POLITICS • రాజకీయం",
+                        "DISTRICT • జిల్లా వార్తలు",
+                        "STATE • రాష్ట్రం",
+                        "SPORTS • క్రీడలు",
+                        "CINEMA • సినిమా",
+                        "TECH & YOUTH • యువత"
+                    ]
+                )
+                u_loc = st.text_input("Location / Mandal / District", value=auth["zone"])
+                u_photo = st.file_uploader("📸 Attach News Photo", type=["jpg", "jpeg", "png", "webp"])
+                u_video = st.text_input("🎬 Video Link (YouTube / Drive / Reel URL)", placeholder="https://...")
+
+                u_te_title = st.text_input("తెలుగు హెడ్‌లైన్ (Telugu Headline)")
+                u_te_body = st.text_area("తెలుగు వార్త (Up to 160 Words Summary)", height=140)
+
+                u_en_title = st.text_input("English Headline")
+                u_en_body = st.text_area("English News Summary (Up to 160 Words)", height=140)
+
+                if role == "Admin":
+                    publish_mode = st.radio(
+                        "Publishing Action",
+                        [
+                            "Publish Live Immediately (Admin Final Approval)",
+                            "Send to Approval Queue (Step 1)"
+                        ]
+                    )
+                else:
+                    st.info("ℹ️ Your submission will be sent to the **News Editor** and **Admin** for verification before going live.")
+                    publish_mode = "Send to Approval Queue (Step 1)"
+
+                if st.form_submit_button("🚀 Submit Story", type="primary", use_container_width=True):
+                    if not u_te_title.strip() and not u_en_title.strip():
+                        st.error("Please enter at least a Telugu or English headline.")
                     else:
-                        st.success("✅ Step 1 Complete! Sent to News Editor in Approval Center.")
+                        img_str = image_to_base64(u_photo) if u_photo is not None else ""
+                        now_time = datetime.datetime.now().strftime("%d %b %Y • %I:%M %p")
+                        is_direct = (role == "Admin" and "Publish Live Immediately" in publish_mode)
 
-    # ---------------- 2. APPROVAL CENTER (వార్తల ఆమోదం) ----------------
-    elif sec == "Approval Center":
-        st.markdown("#### 🛡️ Approval Center • వార్తల ఆమోదం (Steps 2, 3 & 4)")
-        st.caption("Step 2: News Editor verifies & edits ➔ Step 3: Head of App grants final approval ➔ Step 4: Live on App & Web.")
-
-        for idx, story in enumerate(db["stories"]):
-            badge_color = "#15803d" if story["status"] == "Published" else ("#d97706" if story["status"] == "Pending Head Approval" else "#b91c1c")
-            with st.expander(f"[{story['status']}] {story['te_title'][:48]}...", expanded=(story["status"] != "Published")):
-                st.markdown(f"**Reporter:** {story.get('reporter')} | **Location:** {story.get('location')} | **Status:** `{story['status']}`")
-                ed_te_title = st.text_input("Edit Telugu Headline", value=story["te_title"], key=f"ed_tt_{story['id']}")
-                ed_te_body = st.text_area(
-                    f"Edit Telugu Summary ({word_count(story['te_summary'])}/160 words)",
-                    value=story["te_summary"],
-                    height=130,
-                    key=f"ed_tb_{story['id']}"
-                )
-                ed_en_title = st.text_input("Edit English Headline", value=story["en_title"], key=f"ed_et_{story['id']}")
-                ed_en_body = st.text_area(
-                    f"Edit English Summary ({word_count(story['en_summary'])}/160 words)",
-                    value=story["en_summary"],
-                    height=130,
-                    key=f"ed_eb_{story['id']}"
-                )
-
-                b1, b2, b3 = st.columns(3)
-                with b1:
-                    if st.button("✍️ Step 2: Editor Verify", key=f"step2_{story['id']}", use_container_width=True):
-                        db["stories"][idx]["te_title"] = ed_te_title
-                        db["stories"][idx]["te_summary"] = ed_te_body
-                        db["stories"][idx]["en_title"] = ed_en_title
-                        db["stories"][idx]["en_summary"] = ed_en_body
-                        db["stories"][idx]["editor"] = "Verified by News Editor"
-                        db["stories"][idx]["status"] = "Pending Head Approval"
+                        new_story = {
+                            "id": int(datetime.datetime.now().timestamp()),
+                            "status": "Published" if is_direct else "Pending Editor",
+                            "category": u_cat,
+                            "location": u_loc.strip() or auth["zone"],
+                            "time": now_time,
+                            "te_title": u_te_title.strip() or u_en_title.strip(),
+                            "te_summary": u_te_body.strip() or u_en_body.strip(),
+                            "en_title": u_en_title.strip() or u_te_title.strip(),
+                            "en_summary": u_en_body.strip() or u_te_body.strip(),
+                            "image_b64": img_str,
+                            "video_url": u_video.strip(),
+                            "reporter": auth["full_name"],
+                            "reporter_user": auth["username"],
+                            "editor": auth["full_name"] if is_direct else "Awaiting Editor",
+                            "approved_by": auth["full_name"] if is_direct else "Pending Admin",
+                            "views": 1
+                        }
+                        db["stories"].insert(0, new_story)
                         save_db(db)
-                        st.success("Forwarded to Head of App!")
-                        st.rerun()
-                with b2:
-                    if st.button("✅ Step 3&4: Head Approve & Live", type="primary", key=f"step3_{story['id']}", use_container_width=True):
-                        db["stories"][idx]["te_title"] = ed_te_title
-                        db["stories"][idx]["te_summary"] = ed_te_body
-                        db["stories"][idx]["en_title"] = ed_en_title
-                        db["stories"][idx]["en_summary"] = ed_en_body
-                        db["stories"][idx]["approved_by"] = "Head of App"
-                        db["stories"][idx]["status"] = "Published"
+                        if is_direct:
+                            st.success("✅ Approved & Published Live on App and Web!")
+                        else:
+                            st.success("✅ Submitted! Sent to News Editor & Admin Approval Center.")
+
+        # ---------------- 2. REPORTER MY SUBMISSIONS ----------------
+        elif sec == "My Submissions" and role == "Reporter":
+            st.markdown("#### 📋 My Submitted Stories")
+            my_stories = [s for s in db["stories"] if s.get("reporter_user") == auth["username"]]
+            if not my_stories:
+                st.info("You haven't submitted any stories yet.")
+            else:
+                for ms in my_stories:
+                    st.markdown(f"**[{ms['status']}]** {ms['te_title']} — *{ms['time']}*")
+
+        # ---------------- 3. APPROVAL CENTER (ADMIN & NEWS EDITOR) ----------------
+        elif sec == "Approval Center" and role in ["Admin", "News Editor"]:
+            st.markdown("#### 🛡️ Approval Center • వార్తల ఆమోదం")
+            if role == "News Editor":
+                st.caption("As News Editor, verify & edit drafts below and forward them to the Admin for final live publishing.")
+            else:
+                st.caption("As Admin, review, edit, grant final live approval, or unpublish/delete any story.")
+
+            for idx, story in enumerate(db["stories"]):
+                with st.expander(f"[{story['status']}] {story['te_title'][:48]}...", expanded=(story["status"] != "Published")):
+                    st.markdown(f"**Reporter:** {story.get('reporter')} | **Location:** {story.get('location')} | **Status:** `{story['status']}`")
+                    ed_te_title = st.text_input("Telugu Headline", value=story["te_title"], key=f"ed_tt_{story['id']}")
+                    ed_te_body = st.text_area(
+                        f"Telugu Summary ({word_count(story['te_summary'])}/160 words)",
+                        value=story["te_summary"],
+                        height=130,
+                        key=f"ed_tb_{story['id']}"
+                    )
+                    ed_en_title = st.text_input("English Headline", value=story["en_title"], key=f"ed_et_{story['id']}")
+                    ed_en_body = st.text_area(
+                        f"English Summary ({word_count(story['en_summary'])}/160 words)",
+                        value=story["en_summary"],
+                        height=130,
+                        key=f"ed_eb_{story['id']}"
+                    )
+
+                    if role == "News Editor":
+                        if st.button("✍️ Verify & Forward to Admin", type="primary", key=f"step2_{story['id']}", use_container_width=True):
+                            db["stories"][idx]["te_title"] = ed_te_title
+                            db["stories"][idx]["te_summary"] = ed_te_body
+                            db["stories"][idx]["en_title"] = ed_en_title
+                            db["stories"][idx]["en_summary"] = ed_en_body
+                            db["stories"][idx]["editor"] = auth["full_name"]
+                            if db["stories"][idx]["status"] != "Published":
+                                db["stories"][idx]["status"] = "Pending Head Approval"
+                            save_db(db)
+                            st.success("✅ Verified and forwarded to Admin!")
+                            st.rerun()
+
+                    elif role == "Admin":
+                        b1, b2, b3 = st.columns(3)
+                        with b1:
+                            if st.button("✅ Final Approve & Live", type="primary", key=f"app_{story['id']}", use_container_width=True):
+                                db["stories"][idx]["te_title"] = ed_te_title
+                                db["stories"][idx]["te_summary"] = ed_te_body
+                                db["stories"][idx]["en_title"] = ed_en_title
+                                db["stories"][idx]["en_summary"] = ed_en_body
+                                db["stories"][idx]["approved_by"] = auth["full_name"]
+                                db["stories"][idx]["status"] = "Published"
+                                save_db(db)
+                                st.success("✅ Published Live on App & Web!")
+                                st.rerun()
+                        with b2:
+                            if st.button("⏸️ Hold / Unpublish", key=f"hold_{story['id']}", use_container_width=True):
+                                db["stories"][idx]["status"] = "Pending Head Approval"
+                                save_db(db)
+                                st.warning("Moved back to approval queue.")
+                                st.rerun()
+                        with b3:
+                            if st.button("🗑️ Delete", key=f"del_{story['id']}", use_container_width=True):
+                                db["stories"].pop(idx)
+                                save_db(db)
+                                st.rerun()
+
+        # ---------------- 4. STAFF & LOGIN MANAGEMENT (ADMIN ONLY) ----------------
+        elif sec == "Staff Management" and role == "Admin":
+            st.markdown("#### 🔐 Staff Login Management (Admin Exclusive)")
+            st.caption("Create, suspend, reset passwords, or delete staff accounts. Reporters cannot register themselves.")
+
+            with st.form("admin_create_user_form", clear_on_submit=True):
+                st.markdown("**➕ Issue New Staff Login**")
+                new_full = st.text_input("Full Name (e.g., Karthik Reddy)")
+                new_uname = st.text_input("Assign Username (e.g., karthik_rep)")
+                new_pwd = st.text_input("Assign Password", type="password")
+                new_role = st.selectbox("Assign Role", ["Reporter", "News Editor", "Admin"])
+                new_zone = st.text_input("Assigned District / Bureau", value="Hyderabad / Telangana")
+
+                if st.form_submit_button("✅ Create Staff Login Account", type="primary", use_container_width=True):
+                    if not new_full.strip() or not new_uname.strip() or not new_pwd.strip():
+                        st.error("All fields (Name, Username, Password) are required.")
+                    elif any(u["username"].lower() == new_uname.strip().lower() for u in db["users"]):
+                        st.error("That username already exists. Choose a unique username.")
+                    else:
+                        db["users"].append({
+                            "username": new_uname.strip(),
+                            "password_hash": hash_password(new_pwd),
+                            "full_name": new_full.strip(),
+                            "role": new_role,
+                            "zone": new_zone.strip(),
+                            "active": True
+                        })
                         save_db(db)
-                        st.success("Published live on App & Web!")
+                        st.success(f"✅ Login created for **{new_full}** (`{new_uname}` • {new_role})")
                         st.rerun()
-                with b3:
-                    if st.button("🗑️ Delete", key=f"del_{story['id']}", use_container_width=True):
-                        db["stories"].pop(idx)
+
+            st.markdown("#### 👥 Active & Suspended Staff Accounts")
+            for i, u in enumerate(db["users"]):
+                status_tag = "🟢 Active" if u.get("active", True) else "🔴 Suspended"
+                with st.expander(f"{u['full_name']} (@{u['username']}) — {u['role']} [{status_tag}]"):
+                    st.write(f"**Zone:** {u.get('zone', 'State')} | **Role:** `{u['role']}`")
+
+                    # Reset Password
+                    rst_pwd = st.text_input("Set New Password", type="password", key=f"rst_pwd_{u['username']}")
+                    c_u1, c_u2, c_u3 = st.columns(3)
+                    with c_u1:
+                        if st.button("🔑 Update Password", key=f"btn_rst_{u['username']}", use_container_width=True):
+                            if rst_pwd.strip():
+                                db["users"][i]["password_hash"] = hash_password(rst_pwd)
+                                save_db(db)
+                                st.success("Password updated!")
+                    with c_u2:
+                        if u["username"] != "admin":
+                            toggle_label = "⛔ Suspend" if u.get("active", True) else "✅ Activate"
+                            if st.button(toggle_label, key=f"btn_tog_{u['username']}", use_container_width=True):
+                                db["users"][i]["active"] = not u.get("active", True)
+                                save_db(db)
+                                st.rerun()
+                    with c_u3:
+                        if u["username"] != "admin":
+                            if st.button("🗑️ Delete Login", key=f"btn_del_{u['username']}", use_container_width=True):
+                                db["users"].pop(i)
+                                save_db(db)
+                                st.rerun()
+
+        # ---------------- 5. ADVERTISEMENTS (ADMIN ONLY) ----------------
+        elif sec == "Advertisements" and role == "Admin":
+            st.markdown("#### 📣 Advertisements • ప్రకటనల నిర్వహణ")
+            with st.form("add_ad_form", clear_on_submit=True):
+                ad_sponsor = st.text_input("Sponsor / Business Name")
+                ad_tagline = st.text_input("Ad Text / Offer Details")
+                ad_link = st.text_input("Target URL / WhatsApp Link", value="https://dhruvaa-news.streamlit.app")
+                ad_banner = st.file_uploader("Banner Image (Optional)", type=["jpg", "jpeg", "png"])
+                if st.form_submit_button("➕ Publish Ad on Feed", type="primary", use_container_width=True):
+                    if ad_sponsor.strip() and ad_tagline.strip():
+                        b_img = image_to_base64(ad_banner, max_width=800) if ad_banner else ""
+                        db["ads"].insert(0, {
+                            "id": int(datetime.datetime.now().timestamp()),
+                            "sponsor": ad_sponsor.strip(),
+                            "tagline": ad_tagline.strip(),
+                            "link": ad_link.strip(),
+                            "image_b64": b_img,
+                            "active": True
+                        })
+                        save_db(db)
+                        st.success("Ad live across news cards!")
+                        st.rerun()
+
+            for i, ad in enumerate(db["ads"]):
+                c1, c2 = st.columns([3, 1])
+                with c1:
+                    st.markdown(f"**{ad['sponsor']}**: {ad['tagline']}")
+                with c2:
+                    if st.button("Delete", key=f"del_ad_{i}"):
+                        db["ads"].pop(i)
                         save_db(db)
                         st.rerun()
 
-    # ---------------- 3. STAFF MANAGEMENT (రిపోర్టర్ల నిర్వహణ) ----------------
-    elif sec == "Staff Management":
-        st.markdown("#### 👥 Staff Management • రిపోర్టర్ల నిర్వహణ")
-        with st.form("add_staff_form", clear_on_submit=True):
-            s_name = st.text_input("Staff Name")
-            s_role = st.selectbox("Role", ["Reporter", "News Editor", "Head of App"])
-            s_zone = st.text_input("Assigned District / Bureau", value="Telangana / AP")
-            if st.form_submit_button("➕ Add Staff Member", type="primary", use_container_width=True):
-                if s_name.strip():
-                    db["staff"].append({"name": s_name.strip(), "role": s_role, "zone": s_zone.strip(), "active": True})
+        # ---------------- 6. E-PAPER (ADMIN ONLY) ----------------
+        elif sec == "E-Paper" and role == "Admin":
+            st.markdown("#### 📖 E-Paper Management • రోజువారీ పేపర్")
+            with st.form("epaper_form"):
+                ep_title = st.text_input("Edition Title", value=db["epaper"].get("edition_title", ""))
+                ep_highlights = st.text_area("Today's Front-Page Highlights", value=db["epaper"].get("highlights", ""))
+                ep_link = st.text_input("Full PDF / Google Drive Link", value=db["epaper"].get("pdf_or_drive_link", ""))
+                ep_img = st.file_uploader("Upload Front Page Image (JPG/PNG)", type=["jpg", "jpeg", "png"])
+                if st.form_submit_button("💾 Update Daily E-Paper", type="primary", use_container_width=True):
+                    db["epaper"]["edition_title"] = ep_title
+                    db["epaper"]["highlights"] = ep_highlights
+                    db["epaper"]["pdf_or_drive_link"] = ep_link
+                    if ep_img:
+                        db["epaper"]["page_image_b64"] = image_to_base64(ep_img, max_width=1200)
                     save_db(db)
-                    st.success(f"Added {s_name} ({s_role})")
-                    st.rerun()
+                    st.success("✅ E-Paper updated live!")
 
-        for i, m in enumerate(db["staff"]):
-            c1, c2 = st.columns([3, 1])
-            with c1:
-                st.markdown(f"**{m['name']}** — `{m['role']}` ({m['zone']})")
-            with c2:
-                if st.button("Remove", key=f"rm_staff_{i}"):
-                    db["staff"].pop(i)
+        # ---------------- 7. YOUTUBE & LIVE (ADMIN ONLY) ----------------
+        elif sec == "YouTube & Live" and role == "Admin":
+            st.markdown("#### ▶️ YouTube & Live • వీడియోలు, లైవ్")
+            with st.form("yt_live_form"):
+                yt_title = st.text_input("Channel / Live Stream Title", value=db["youtube_live"].get("channel_title", ""))
+                yt_url = st.text_input("YouTube Live or Video URL", value=db["youtube_live"].get("live_url", ""))
+                yt_tick = st.text_input("Live Scrolling Ticker", value=db["youtube_live"].get("ticker", ""))
+                if st.form_submit_button("💾 Update Live Stream", type="primary", use_container_width=True):
+                    db["youtube_live"]["channel_title"] = yt_title
+                    db["youtube_live"]["live_url"] = yt_url
+                    db["youtube_live"]["ticker"] = yt_tick
                     save_db(db)
-                    st.rerun()
+                    st.success("✅ YouTube & Live settings updated!")
 
-    # ---------------- 4. ADVERTISEMENTS (ప్రకటనల నిర్వహణ) ----------------
-    elif sec == "Advertisements":
-        st.markdown("#### 📣 Advertisements • ప్రకటనల నిర్వహణ")
-        with st.form("add_ad_form", clear_on_submit=True):
-            ad_sponsor = st.text_input("Sponsor / Business Name")
-            ad_tagline = st.text_input("Ad Text / Offer Details")
-            ad_link = st.text_input("Target URL / WhatsApp Link", value="https://dhruvaa-news.streamlit.app")
-            ad_banner = st.file_uploader("Banner Image (Optional)", type=["jpg", "jpeg", "png"])
-            if st.form_submit_button("➕ Publish Ad on Feed", type="primary", use_container_width=True):
-                if ad_sponsor.strip() and ad_tagline.strip():
-                    b_img = image_to_base64(ad_banner, max_width=800) if ad_banner else ""
-                    db["ads"].insert(0, {
-                        "id": int(datetime.datetime.now().timestamp()),
-                        "sponsor": ad_sponsor.strip(),
-                        "tagline": ad_tagline.strip(),
-                        "link": ad_link.strip(),
-                        "image_b64": b_img,
-                        "active": True
-                    })
-                    save_db(db)
-                    st.success("Ad live across news cards!")
-                    st.rerun()
+        # ---------------- 8. NOTIFICATIONS (ADMIN ONLY) ----------------
+        elif sec == "Notifications" and role == "Admin":
+            st.markdown("#### 🔔 Notifications • బ్రేకింగ్ అలర్ట్స్")
+            with st.form("notif_form", clear_on_submit=True):
+                n_title = st.text_input("Breaking Alert Headline", placeholder="🔴 BREAKING: ...")
+                n_msg = st.text_area("Alert Details", height=80)
+                if st.form_submit_button("📢 Broadcast Breaking Alert", type="primary", use_container_width=True):
+                    if n_title.strip():
+                        db["notifications"].insert(0, {
+                            "id": int(datetime.datetime.now().timestamp()),
+                            "time": datetime.datetime.now().strftime("%d %b %Y • %I:%M %p"),
+                            "title": n_title.strip(),
+                            "message": n_msg.strip()
+                        })
+                        save_db(db)
+                        st.success("✅ Breaking Alert pushed to top ticker!")
+                        st.rerun()
 
-        for i, ad in enumerate(db["ads"]):
-            c1, c2 = st.columns([3, 1])
-            with c1:
-                st.markdown(f"**{ad['sponsor']}**: {ad['tagline']}")
-            with c2:
-                if st.button("Delete", key=f"del_ad_{i}"):
-                    db["ads"].pop(i)
-                    save_db(db)
-                    st.rerun()
+            for n in db.get("notifications", [])[:10]:
+                st.markdown(f"- **{n['title']}** ({n['time']}) — {n['message']}")
 
-    # ---------------- 5. E-PAPER (రోజువారీ పేపర్) ----------------
-    elif sec == "E-Paper":
-        st.markdown("#### 📖 E-Paper Management • రోజువారీ పేపర్")
-        with st.form("epaper_form"):
-            ep_title = st.text_input("Edition Title", value=db["epaper"].get("edition_title", ""))
-            ep_highlights = st.text_area("Today's Front-Page Highlights", value=db["epaper"].get("highlights", ""))
-            ep_link = st.text_input("Full PDF / Google Drive Link", value=db["epaper"].get("pdf_or_drive_link", ""))
-            ep_img = st.file_uploader("Upload Front Page Image (JPG/PNG)", type=["jpg", "jpeg", "png"])
-            if st.form_submit_button("💾 Update Daily E-Paper", type="primary", use_container_width=True):
-                db["epaper"]["edition_title"] = ep_title
-                db["epaper"]["highlights"] = ep_highlights
-                db["epaper"]["pdf_or_drive_link"] = ep_link
-                if ep_img:
-                    db["epaper"]["page_image_b64"] = image_to_base64(ep_img, max_width=1200)
-                save_db(db)
-                st.success("✅ E-Paper updated live!")
+        # ---------------- 9. REPORTS (ADMIN ONLY) ----------------
+        elif sec == "Reports" and role == "Admin":
+            st.markdown("#### 📈 Reports • వీక్షణలు, గణాంకాలు")
+            total_stories = len(db["stories"])
+            pub_stories = len([s for s in db["stories"] if s["status"] == "Published"])
+            pend_editor = len([s for s in db["stories"] if s["status"] == "Pending Editor"])
+            pend_head = len([s for s in db["stories"] if s["status"] == "Pending Head Approval"])
+            total_views = sum(s.get("views", 0) for s in db["stories"])
 
-    # ---------------- 6. YOUTUBE & LIVE (వీడియోలు, లైవ్) ----------------
-    elif sec == "YouTube & Live":
-        st.markdown("#### ▶️ YouTube & Live • వీడియోలు, లైవ్")
-        with st.form("yt_live_form"):
-            yt_title = st.text_input("Channel / Live Stream Title", value=db["youtube_live"].get("channel_title", ""))
-            yt_url = st.text_input("YouTube Live or Video URL", value=db["youtube_live"].get("live_url", ""))
-            yt_tick = st.text_input("Live Scrolling Ticker", value=db["youtube_live"].get("ticker", ""))
-            if st.form_submit_button("💾 Update Live Stream", type="primary", use_container_width=True):
-                db["youtube_live"]["channel_title"] = yt_title
-                db["youtube_live"]["live_url"] = yt_url
-                db["youtube_live"]["ticker"] = yt_tick
-                save_db(db)
-                st.success("✅ YouTube & Live settings updated!")
+            m1, m2, m3 = st.columns(3)
+            m1.metric("Published Live", pub_stories)
+            m2.metric("Pending Approval", pend_editor + pend_head)
+            m3.metric("Total Readers", f"{total_views:,}")
 
-    # ---------------- 7. NOTIFICATIONS (బ్రేకింగ్ అలర్ట్స్) ----------------
-    elif sec == "Notifications":
-        st.markdown("#### 🔔 Notifications • బ్రేకింగ్ అలర్ట్స్")
-        with st.form("notif_form", clear_on_submit=True):
-            n_title = st.text_input("Breaking Alert Headline", placeholder="🔴 BREAKING: ...")
-            n_msg = st.text_area("Alert Details", height=80)
-            if st.form_submit_button("📢 Broadcast Breaking Alert", type="primary", use_container_width=True):
-                if n_title.strip():
-                    db["notifications"].insert(0, {
-                        "id": int(datetime.datetime.now().timestamp()),
-                        "time": datetime.datetime.now().strftime("%d %b %Y • %I:%M %p"),
-                        "title": n_title.strip(),
-                        "message": n_msg.strip()
-                    })
-                    save_db(db)
-                    st.success("✅ Breaking Alert pushed to top ticker!")
-                    st.rerun()
-
-        for n in db.get("notifications", [])[:10]:
-            st.markdown(f"- **{n['title']}** ({n['time']}) — {n['message']}")
-
-    # ---------------- 8. REPORTS (వీక్షణలు, గణాంకాలు) ----------------
-    elif sec == "Reports":
-        st.markdown("#### 📈 Reports • వీక్షణలు, గణాంకాలు")
-        total_stories = len(db["stories"])
-        pub_stories = len([s for s in db["stories"] if s["status"] == "Published"])
-        pend_editor = len([s for s in db["stories"] if s["status"] == "Pending Editor"])
-        pend_head = len([s for s in db["stories"] if s["status"] == "Pending Head Approval"])
-        total_views = sum(s.get("views", 0) for s in db["stories"])
-
-        m1, m2, m3 = st.columns(3)
-        m1.metric("Published Live", pub_stories)
-        m2.metric("In Approval Queue", pend_editor + pend_head)
-        m3.metric("Total Readers", f"{total_views:,}")
-
-        st.markdown("**Workflow Status Breakdown:**")
-        st.write(f"- Step 1/2 (Awaiting News Editor): **{pend_editor}**")
-        st.write(f"- Step 3 (Awaiting Head of App): **{pend_head}**")
-        st.write(f"- Step 4 (Live on App & Web): **{pub_stories}** of {total_stories} total stories")
+            st.markdown("**Editorial Pipeline & Staff Summary:**")
+            st.write(f"- Active Staff Accounts: **{len([u for u in db['users'] if u.get('active', True)])}**")
+            st.write(f"- Step 1/2 (Awaiting News Editor): **{pend_editor}**")
+            st.write(f"- Step 3 (Awaiting Admin Final Approval): **{pend_head}**")
+            st.write(f"- Step 4 (Live on App & Web): **{pub_stories}** of {total_stories} total stories")
