@@ -1,5 +1,5 @@
 const CACHE_NAME = 'dhruvaa-news-v1';
-const ASSETS = ['./', './index.html', './manifest.json', './DHRUVAA.jpg'];
+const ASSETS = ['./', './index.html', './manifest.json', './dhruva logo.png'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
